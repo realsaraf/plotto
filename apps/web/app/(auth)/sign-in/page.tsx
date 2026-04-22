@@ -31,7 +31,15 @@ export default async function SignInPage({
           <SignInForm initialError={error ?? null} />
         </div>
         <p className="mt-6 text-center text-xs text-ink-400">
-          By signing in you agree to treat early Plotto as rough around the edges.
+          By signing in you agree to Plotto&apos;s{' '}
+          <Link href="/tos" className="underline hover:text-ink-700">
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="underline hover:text-ink-700">
+            Privacy Policy
+          </Link>
+          .
         </p>
       </div>
     </main>

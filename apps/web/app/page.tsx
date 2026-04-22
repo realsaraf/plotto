@@ -104,9 +104,22 @@ export default async function LandingPage() {
       </section>
 
       <footer className="border-t border-ink-100 bg-white/50">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6 text-xs text-ink-500">
-          <span>© {new Date().getFullYear()} Plotto</span>
-          <span>Built with care · Early preview</span>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-ink-500">
+          <span>© {new Date().getFullYear()} Plotto · Early preview</span>
+          <nav className="flex items-center gap-4">
+            <Link href="/privacy" className="hover:text-ink-900">
+              Privacy
+            </Link>
+            <Link href="/tos" className="hover:text-ink-900">
+              Terms
+            </Link>
+            <a
+              href="mailto:support@getplotto.com"
+              className="hover:text-ink-900"
+            >
+              Contact
+            </a>
+          </nav>
         </div>
       </footer>
     </main>
