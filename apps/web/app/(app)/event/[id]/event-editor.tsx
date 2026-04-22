@@ -67,7 +67,7 @@ export default function EventEditor({ event }: { event: EventRow }) {
 
   return (
     <div className="rounded-2xl border border-ink-100 bg-white p-6">
-      <h1 className="mb-5 text-xl font-semibold tracking-tight">Edit event</h1>
+      <h1 className="mb-5 text-xl font-semibold tracking-tight">Edit plotto</h1>
       <div className="space-y-4">
         <Field label="Title">
           <input

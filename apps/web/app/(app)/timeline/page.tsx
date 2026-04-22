@@ -56,7 +56,7 @@ function EmptyState() {
       <div className="mx-auto mb-4 h-1.5 w-8 rounded-full bg-coral-500" />
       <h2 className="text-lg font-semibold text-ink-900">Nothing plotted yet</h2>
       <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-500">
-        Paste an email, describe an appointment, or drop any text — Plotto
+        Paste an email, describe something coming up, or drop any text — Plotto
         will pull out the details.
       </p>
       <Link

@@ -436,14 +436,14 @@ Each phase has a clear deliverable and demo criterion. Status is updated after e
 **Requested scope:**
 - [x] Foundation: add user settings, people entities, meeting/action link fields, and phone fields in Supabase (`0004_settings_people_links.sql`) (2026-04-22)
 - [x] Foundation: add Twilio Verify service setup, Vercel env vars, and web phone verification API routes (2026-04-22)
-- [ ] Settings page: let users set a default work schedule
+- [x] Settings page: let users set a default work schedule (2026-04-22)
 - [ ] Capture warnings: when a newly extracted plotto conflicts with the saved work schedule, warn and let the user save anyway
 - [ ] Action links: detect Zoom/Google Meet/Teams/Webex/general URLs and phone numbers from capture details
 - [ ] Plotto cards + detail view: render one-tap buttons for meeting links and tap-to-dial numbers
 - [ ] Reminder settings: add an email reminder toggle and send email 5 minutes before any `hard_block` plotto
-- [ ] Phone settings: let users add a mobile number and complete OTP verification from settings
+- [x] Phone settings: let users add a mobile number and complete OTP verification from settings (2026-04-22)
 - [ ] Multi-plotto capture: a single capture can create multiple plottos when multiple real-world items are described
-- [ ] Timeline cards: show both start and end times when `ends_at` exists
+- [x] Timeline cards: show both start and end times when `ends_at` exists (2026-04-22)
 - [ ] People graph: extract named people as first-class records, display them as color pills, and support searching/filtering plottos by person
 - [ ] Rebrand touched web copy from "event/meeting" to "plotto"
 

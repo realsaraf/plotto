@@ -27,6 +27,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               Timeline
             </Link>
             <Link
+              href="/settings"
+              className="rounded-lg px-3 py-1.5 font-medium text-ink-700 hover:bg-white hover:text-ink-900"
+            >
+              Settings
+            </Link>
+            <Link
               href="/capture"
               className="rounded-lg bg-ink-900 px-3 py-1.5 font-medium text-white hover:bg-ink-800"
             >

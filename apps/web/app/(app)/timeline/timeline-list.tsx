@@ -2,17 +2,31 @@
 
 import Link from 'next/link';
 import { useMemo, useState, useEffect } from 'react';
-import { format, isToday, isTomorrow, isThisWeek, isPast, isThisYear } from 'date-fns';
+import { format, isPast, isSameDay, isThisWeek, isThisYear, isToday, isTomorrow } from 'date-fns';
 import type { EventRow } from '@/lib/types';
 import EventStatusControls from './event-status-controls';
 
-function formatWhen(startsAt: string, allDay: boolean): string {
+function formatTimeRange(startsAt: Date, endsAt: string | null): string {
+  if (!endsAt) return format(startsAt, 'h:mm a');
+
+  const ends = new Date(endsAt);
+  if (!isSameDay(startsAt, ends)) {
+    return `${format(startsAt, 'h:mm a')} → ${format(ends, 'MMM d h:mm a')}`;
+  }
+
+  const sameMeridiem = format(startsAt, 'a') === format(ends, 'a');
+  const startLabel = format(startsAt, sameMeridiem ? 'h:mm' : 'h:mm a');
+  return `${startLabel}–${format(ends, 'h:mm a')}`;
+}
+
+function formatWhen(startsAt: string, endsAt: string | null, allDay: boolean): string {
   const d = new Date(startsAt);
-  if (isToday(d)) return allDay ? 'Today' : `Today · ${format(d, 'h:mm a')}`;
-  if (isTomorrow(d)) return allDay ? 'Tomorrow' : `Tom · ${format(d, 'h:mm a')}`;
-  if (isThisWeek(d, { weekStartsOn: 1 })) return allDay ? format(d, 'EEE') : format(d, 'EEE h:mm a');
-  if (isThisYear(d)) return allDay ? format(d, 'MMM d') : format(d, 'MMM d · h:mm a');
-  return format(d, 'MMM d, yyyy');
+  const timeLabel = formatTimeRange(d, endsAt);
+  if (isToday(d)) return allDay ? 'Today' : `Today · ${timeLabel}`;
+  if (isTomorrow(d)) return allDay ? 'Tomorrow' : `Tom · ${timeLabel}`;
+  if (isThisWeek(d, { weekStartsOn: 1 })) return allDay ? format(d, 'EEE') : `${format(d, 'EEE')} · ${timeLabel}`;
+  if (isThisYear(d)) return allDay ? format(d, 'MMM d') : `${format(d, 'MMM d')} · ${timeLabel}`;
+  return allDay ? format(d, 'MMM d, yyyy') : `${format(d, 'MMM d, yyyy')} · ${timeLabel}`;
 }
 
 function bucketize(events: EventRow[]) {
@@ -111,7 +125,7 @@ function EventCard({ event, muted = false }: { event: EventRow; muted?: boolean 
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-medium text-ink-900">{event.title}</h3>
             <span className="shrink-0 text-xs tabular-nums text-ink-500">
-              {formatWhen(event.starts_at, event.all_day)}
+              {formatWhen(event.starts_at, event.ends_at, event.all_day)}
             </span>
           </div>
           {event.location && <p className="mt-0.5 text-xs text-ink-500">📍 {event.location}</p>}
@@ -121,7 +135,7 @@ function EventCard({ event, muted = false }: { event: EventRow; muted?: boolean 
               href={`/event/${event.id}`}
               className="text-xs font-medium text-ink-500 hover:text-coral-600"
             >
-              Edit →
+              Edit plotto →
             </Link>
             <EventStatusControls eventId={event.id} status={event.status} />
           </div>
