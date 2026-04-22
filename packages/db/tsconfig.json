@@ -1,0 +1,9 @@
+{
+  "extends": "@plotto/tsconfig/base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "noEmit": false
+  },
+  "include": ["src/**/*", "drizzle.config.ts"]
+}

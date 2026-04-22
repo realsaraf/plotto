@@ -1,0 +1,11 @@
+{
+  "extends": "@plotto/tsconfig/base.json",
+  "include": [],
+  "references": [
+    { "path": "./packages/tsconfig" },
+    { "path": "./packages/schema" },
+    { "path": "./packages/db" },
+    { "path": "./packages/ai" },
+    { "path": "./packages/ui-tokens" }
+  ]
+}
