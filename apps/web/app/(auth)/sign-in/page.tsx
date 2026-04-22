@@ -5,7 +5,13 @@ export const metadata = {
   title: 'Sign in · Plotto',
 };
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-paper-50 px-4 py-12">
       <div className="w-full max-w-md">
@@ -18,9 +24,10 @@ export default function SignInPage() {
             Welcome back
           </h1>
           <p className="mb-6 text-sm text-ink-500">
-            Enter your email and we&apos;ll send you a magic link.
+            Use Google, Apple, or a magic link. If the email is the same and verified,
+            Supabase will keep it in the same Plotto account.
           </p>
-          <SignInForm />
+          <SignInForm initialError={error ?? null} />
         </div>
         <p className="mt-6 text-center text-xs text-ink-400">
           By signing in you agree to treat early Plotto as rough around the edges.
