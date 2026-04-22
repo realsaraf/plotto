@@ -1,3 +1,20 @@
+export interface MeetingLink {
+  type: 'zoom' | 'meet' | 'teams' | 'webex' | 'phone' | 'url';
+  url: string;
+  label: string | null;
+}
+
+export interface PhoneNumber {
+  number: string;
+  label: string | null;
+}
+
+export interface PersonPill {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface EventRow {
   id: string;
   title: string;
@@ -10,6 +27,9 @@ export interface EventRow {
   reminder_strategy: 'silent' | 'standard' | 'critical';
   confidence: number | null;
   status: 'active' | 'snoozed' | 'done' | 'cancelled';
+  meeting_links?: MeetingLink[] | null;
+  phone_numbers?: PhoneNumber[] | null;
+  people?: PersonPill[] | null;
 }
 
 export interface CaptureRow {

@@ -1,6 +1,11 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
-import { ExtractedEventSchema, type ExtractedEvent } from '@plotto/schema';
+import {
+  ExtractedEventSchema,
+  ExtractionResponseSchema,
+  type ExtractedEvent,
+  type ExtractionResponse,
+} from '@plotto/schema';
 
 export interface ExtractOptions {
   /** User-provided text/share payload. */
@@ -16,7 +21,10 @@ export interface ExtractOptions {
 }
 
 export interface ExtractionResult {
+  /** Back-compat: the first plotto flattened to the legacy ExtractedEvent shape. */
   event: ExtractedEvent;
+  /** All extracted plottos with people, meeting links, phone numbers. */
+  response: ExtractionResponse;
   /** Usage for cost tracking (best-effort; null on older SDKs). */
   usage: { inputTokens: number; outputTokens: number } | null;
   /** Model actually used. */
@@ -27,8 +35,12 @@ export interface ExtractionResult {
 
 const SYSTEM_PROMPT = [
   'You are Plotto, a calm assistant that turns messy human text (emails,',
-  'screenshots, voice transcripts, share-sheet pastes) into one structured',
-  'calendar event.',
+  'screenshots, voice transcripts, share-sheet pastes) into structured',
+  'calendar items called "plottos".',
+  '',
+  'A single input may describe MULTIPLE real-world items. Return each one as',
+  'its own plotto in the `plottos` array. If the input describes only one,',
+  'return an array with exactly one plotto.',
   '',
   'RULES:',
   '- Output ISO 8601 datetimes with timezone offset derived from the user timezone.',
@@ -39,43 +51,127 @@ const SYSTEM_PROMPT = [
   '  hard_block (critical alarm — flights, interviews, medical).',
   '- reminderStrategy: silent / standard / critical — match importance.',
   '- recurrenceRule: RFC 5545 RRULE string or null.',
-  '- allDay: true only when no time is specified AND the event spans a whole day.',
+  '- allDay: true only when no time is specified AND the item spans a whole day.',
+  '- endsAt: set only when an explicit end time is present; otherwise null.',
   '- description: a short human note (max 280 chars) or null.',
+  '',
+  'PEOPLE:',
+  '- Extract real human names mentioned in the text as `people` entries.',
+  '- `name` is the full human-readable name; `role` is an optional short label',
+  '  (e.g. "dentist", "manager", "mom") or null.',
+  '- Do NOT include company names, product names, or the user themselves.',
+  '- Deduplicate people within a single plotto.',
+  '',
+  'MEETING LINKS:',
+  '- Detect meeting URLs and classify them:',
+  '    zoom   → zoom.us / *.zoom.us / zoom.com',
+  '    meet   → meet.google.com / g.co/meet',
+  '    teams  → teams.microsoft.com / teams.live.com',
+  '    webex  → *.webex.com',
+  '    url    → any other legitimate http(s) URL relevant to the plotto',
+  '- `label` is an optional short human name for the link (or null).',
+  '- Do NOT invent URLs that are not in the source text.',
+  '',
+  'PHONE NUMBERS:',
+  '- Extract dial-in or contact phone numbers as `phoneNumbers`.',
+  '- Preserve the original format when possible; `label` is optional.',
+  '- Do NOT include fax numbers or numbers that are clearly not phone numbers.',
 ].join('\n');
 
 /**
  * JSON schema the model is forced to conform to (OpenAI Structured Outputs).
- * Keep in sync with ExtractedEventSchema (Zod) — Zod still validates after.
+ * Keep in sync with ExtractedPlottoSchema (Zod) — Zod still validates after.
  */
-const EXTRACTED_EVENT_JSON_SCHEMA = {
+const EXTRACTION_RESPONSE_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    title: { type: 'string' },
-    description: { type: ['string', 'null'] },
-    startsAt: { type: 'string' },
-    endsAt: { type: ['string', 'null'] },
-    location: { type: ['string', 'null'] },
-    allDay: { type: 'boolean' },
-    recurrenceRule: { type: ['string', 'null'] },
-    importance: { type: 'string', enum: ['ambient', 'soft_block', 'hard_block'] },
-    reminderStrategy: { type: 'string', enum: ['silent', 'standard', 'critical'] },
-    confidence: { type: 'number' },
-    clarifyingQuestion: { type: ['string', 'null'] },
+    plottos: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 10,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          title: { type: 'string' },
+          description: { type: ['string', 'null'] },
+          startsAt: { type: 'string' },
+          endsAt: { type: ['string', 'null'] },
+          location: { type: ['string', 'null'] },
+          allDay: { type: 'boolean' },
+          recurrenceRule: { type: ['string', 'null'] },
+          importance: {
+            type: 'string',
+            enum: ['ambient', 'soft_block', 'hard_block'],
+          },
+          reminderStrategy: {
+            type: 'string',
+            enum: ['silent', 'standard', 'critical'],
+          },
+          confidence: { type: 'number' },
+          clarifyingQuestion: { type: ['string', 'null'] },
+          people: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                name: { type: 'string' },
+                role: { type: ['string', 'null'] },
+              },
+              required: ['name', 'role'],
+            },
+          },
+          meetingLinks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                type: {
+                  type: 'string',
+                  enum: ['zoom', 'meet', 'teams', 'webex', 'phone', 'url'],
+                },
+                url: { type: 'string' },
+                label: { type: ['string', 'null'] },
+              },
+              required: ['type', 'url', 'label'],
+            },
+          },
+          phoneNumbers: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                number: { type: 'string' },
+                label: { type: ['string', 'null'] },
+              },
+              required: ['number', 'label'],
+            },
+          },
+        },
+        required: [
+          'title',
+          'description',
+          'startsAt',
+          'endsAt',
+          'location',
+          'allDay',
+          'recurrenceRule',
+          'importance',
+          'reminderStrategy',
+          'confidence',
+          'clarifyingQuestion',
+          'people',
+          'meetingLinks',
+          'phoneNumbers',
+        ],
+      },
+    },
   },
-  required: [
-    'title',
-    'description',
-    'startsAt',
-    'endsAt',
-    'location',
-    'allDay',
-    'recurrenceRule',
-    'importance',
-    'reminderStrategy',
-    'confidence',
-    'clarifyingQuestion',
-  ],
+  required: ['plottos'],
 } as const;
 
 export async function extractEvent(opts: ExtractOptions): Promise<ExtractionResult> {
@@ -105,9 +201,9 @@ export async function extractEvent(opts: ExtractOptions): Promise<ExtractionResu
     response_format: {
       type: 'json_schema',
       json_schema: {
-        name: 'ExtractedEvent',
+        name: 'PlottoExtraction',
         strict: true,
-        schema: EXTRACTED_EVENT_JSON_SCHEMA as unknown as Record<string, unknown>,
+        schema: EXTRACTION_RESPONSE_JSON_SCHEMA as unknown as Record<string, unknown>,
       },
     },
   });
@@ -122,13 +218,30 @@ export async function extractEvent(opts: ExtractOptions): Promise<ExtractionResu
     throw new Error(`OpenAI returned non-JSON content: ${(e as Error).message}`);
   }
 
-  const result = ExtractedEventSchema.safeParse(parsed);
+  const result = ExtractionResponseSchema.safeParse(parsed);
   if (!result.success) {
-    throw new ExtractionValidationError('Extracted event failed Zod validation', result.error);
+    throw new ExtractionValidationError('Extracted plottos failed Zod validation', result.error);
   }
 
+  // Legacy back-compat: surface the first plotto under `event`.
+  const first = result.data.plottos[0]!;
+  const legacyEvent = ExtractedEventSchema.parse({
+    title: first.title,
+    description: first.description,
+    startsAt: first.startsAt,
+    endsAt: first.endsAt,
+    location: first.location,
+    allDay: first.allDay,
+    recurrenceRule: first.recurrenceRule,
+    importance: first.importance,
+    reminderStrategy: first.reminderStrategy,
+    confidence: first.confidence,
+    clarifyingQuestion: first.clarifyingQuestion,
+  });
+
   return {
-    event: result.data,
+    event: legacyEvent,
+    response: result.data,
     usage: completion.usage
       ? {
           inputTokens: completion.usage.prompt_tokens ?? 0,

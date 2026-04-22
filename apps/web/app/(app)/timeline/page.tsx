@@ -1,22 +1,26 @@
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase/server';
-import type { EventRow } from '@/lib/types';
+import type { EventRow, PersonPill } from '@/lib/types';
 import TimelineList from './timeline-list';
 
 export const metadata = { title: 'Timeline · Plotto' };
 export const dynamic = 'force-dynamic';
+
+type RawEvent = Omit<EventRow, 'people'> & {
+  event_people?: { people: { id: string; name: string; color: string } | null }[] | null;
+};
 
 export default async function TimelinePage() {
   const supabase = await supabaseServer();
   const { data: events, error } = await supabase
     .from('events')
     .select(
-      'id, title, description, starts_at, ends_at, location, all_day, importance, reminder_strategy, confidence, status',
+      'id, title, description, starts_at, ends_at, location, all_day, importance, reminder_strategy, confidence, status, meeting_links, phone_numbers, event_people(people(id, name, color))',
     )
     .in('status', ['active', 'snoozed'])
     .order('starts_at', { ascending: true })
     .limit(200)
-    .returns<EventRow[]>();
+    .returns<RawEvent[]>();
 
   if (error) {
     return (
@@ -26,7 +30,28 @@ export default async function TimelinePage() {
     );
   }
 
-  const all = events ?? [];
+  const all: EventRow[] = (events ?? []).map((e) => {
+    const people: PersonPill[] = (e.event_people ?? [])
+      .map((ep) => ep.people)
+      .filter((p): p is { id: string; name: string; color: string } => p !== null)
+      .map((p) => ({ id: p.id, name: p.name, color: p.color }));
+    return {
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      starts_at: e.starts_at,
+      ends_at: e.ends_at,
+      location: e.location,
+      all_day: e.all_day,
+      importance: e.importance,
+      reminder_strategy: e.reminder_strategy,
+      confidence: e.confidence,
+      status: e.status,
+      meeting_links: e.meeting_links ?? [],
+      phone_numbers: e.phone_numbers ?? [],
+      people,
+    };
+  });
 
   return (
     <div className="space-y-8">

@@ -5,6 +5,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { format, isPast, isSameDay, isThisWeek, isThisYear, isToday, isTomorrow } from 'date-fns';
 import type { EventRow } from '@/lib/types';
 import EventStatusControls from './event-status-controls';
+import { ActionLinks, PersonPills } from '@/components/plotto-bits';
 
 function formatTimeRange(startsAt: Date, endsAt: string | null): string {
   if (!endsAt) return format(startsAt, 'h:mm a');
@@ -130,6 +131,11 @@ function EventCard({ event, muted = false }: { event: EventRow; muted?: boolean 
           </div>
           {event.location && <p className="mt-0.5 text-xs text-ink-500">📍 {event.location}</p>}
           {event.description && <p className="mt-1.5 text-sm text-ink-600">{event.description}</p>}
+          <PersonPills people={event.people} />
+          <ActionLinks
+            meetingLinks={event.meeting_links}
+            phoneNumbers={event.phone_numbers}
+          />
           <div className="mt-2 flex items-center justify-between">
             <Link
               href={`/event/${event.id}`}

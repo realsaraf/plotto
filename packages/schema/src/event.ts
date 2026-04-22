@@ -57,3 +57,45 @@ export const ExtractedEventSchema = z.object({
   clarifyingQuestion: z.string().nullable().default(null),
 });
 export type ExtractedEvent = z.infer<typeof ExtractedEventSchema>;
+
+// ─── Multi-plotto extraction (v2) ───────────────────────────────────────
+export const MeetingLinkTypeSchema = z.enum([
+  'zoom',
+  'meet',
+  'teams',
+  'webex',
+  'phone',
+  'url',
+]);
+export type MeetingLinkType = z.infer<typeof MeetingLinkTypeSchema>;
+
+export const MeetingLinkSchema = z.object({
+  type: MeetingLinkTypeSchema,
+  url: z.string().min(1),
+  label: z.string().nullable().default(null),
+});
+export type MeetingLink = z.infer<typeof MeetingLinkSchema>;
+
+export const PhoneNumberSchema = z.object({
+  number: z.string().min(1),
+  label: z.string().nullable().default(null),
+});
+export type PhoneNumber = z.infer<typeof PhoneNumberSchema>;
+
+export const ExtractedPersonSchema = z.object({
+  name: z.string().min(1).max(120),
+  role: z.string().max(120).nullable().default(null),
+});
+export type ExtractedPerson = z.infer<typeof ExtractedPersonSchema>;
+
+export const ExtractedPlottoSchema = ExtractedEventSchema.extend({
+  people: z.array(ExtractedPersonSchema).default([]),
+  meetingLinks: z.array(MeetingLinkSchema).default([]),
+  phoneNumbers: z.array(PhoneNumberSchema).default([]),
+});
+export type ExtractedPlotto = z.infer<typeof ExtractedPlottoSchema>;
+
+export const ExtractionResponseSchema = z.object({
+  plottos: z.array(ExtractedPlottoSchema).min(1).max(10),
+});
+export type ExtractionResponse = z.infer<typeof ExtractionResponseSchema>;
