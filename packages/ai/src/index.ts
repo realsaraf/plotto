@@ -1,6 +1,13 @@
 /**
  * Plotto AI extraction module.
- * Real OpenAI prompt + extraction pipeline lands in Phase 2.
  */
 
-export const AI_PACKAGE_VERSION = '0.0.0' as const;
+export const AI_PACKAGE_VERSION = '0.1.0' as const;
+
+export {
+  extractEvent,
+  estimateCostCents,
+  ExtractionValidationError,
+  type ExtractOptions,
+  type ExtractionResult,
+} from './extraction';
