@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { env } from '@/lib/env';
+import { sendSms } from '@/lib/twilio';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,10 +9,11 @@ export const dynamic = 'force-dynamic';
 /**
  * Reminder delivery worker.
  *
- * Triggered every minute (Vercel Cron or Supabase pg_cron). Finds any
- * `hard_block` plotto starting in the next ~5 minutes for users who have
- * `email_reminders_enabled = true`, sends an email via Resend, and writes
- * a `reminders` row so we never double-send.
+ * Runs every minute (Supabase pg_cron in production; Vercel Cron still wired
+ * for staging). Finds any `hard_block` plotto starting in the next ~5 minutes
+ * and, for each user, fans out over the channels they've enabled in
+ * `reminder_preferences.hard_block.{email, sms}`. Writes a `reminders` row
+ * per channel so we never double-send.
  *
  * Auth: Bearer ${CRON_SECRET}.
  */
@@ -31,6 +33,28 @@ type EventRow = {
   meeting_links: { type: string; url: string; label: string | null }[] | null;
   importance: string;
   status: string;
+};
+
+type ChannelPrefs = { push: boolean; email: boolean; sms: boolean };
+type ReminderPreferences = {
+  ambient: ChannelPrefs;
+  soft_block: ChannelPrefs;
+  hard_block: ChannelPrefs;
+};
+
+type UserRow = {
+  id: string;
+  email: string | null;
+  timezone: string | null;
+  phone: string | null;
+  phone_verified: boolean | null;
+  reminder_preferences: ReminderPreferences | null;
+};
+
+const DEFAULT_PREFS: ReminderPreferences = {
+  ambient:    { push: false, email: false, sms: false },
+  soft_block: { push: true,  email: false, sms: false },
+  hard_block: { push: true,  email: true,  sms: false },
 };
 
 async function run(req: NextRequest) {
@@ -70,64 +94,127 @@ async function run(req: NextRequest) {
     return NextResponse.json({ checked: 0, sent: 0 });
   }
 
-  // Filter out events that already have an 'email' reminder row.
+  // Grab every reminder already fired for these events (any channel) so we
+  // can skip channels we've already sent.
   const ids = candidates.map((e) => e.id);
   const { data: existing } = await admin
     .from('reminders')
-    .select('event_id')
-    .eq('channel', 'email')
+    .select('event_id, channel')
     .in('event_id', ids);
-  const alreadySent = new Set((existing ?? []).map((r: { event_id: string }) => r.event_id));
-  const todo = candidates.filter((e) => !alreadySent.has(e.id));
-  if (todo.length === 0) {
-    return NextResponse.json({ checked: candidates.length, sent: 0 });
-  }
-
-  // Load matching users (only those with email reminders enabled).
-  const userIds = Array.from(new Set(todo.map((e) => e.user_id)));
-  const { data: users } = await admin
-    .from('users')
-    .select('id, email, timezone, email_reminders_enabled')
-    .in('id', userIds);
-  const userById = new Map(
-    (users ?? []).map((u: { id: string; email: string; timezone: string; email_reminders_enabled: boolean }) => [u.id, u]),
+  const firedKey = new Set<string>(
+    (existing ?? []).map(
+      (r: { event_id: string; channel: string }) => `${r.event_id}:${r.channel}`,
+    ),
   );
 
-  let sent = 0;
+  // Load every candidate user and their preferences.
+  const userIds = Array.from(new Set(candidates.map((e) => e.user_id)));
+  const { data: users } = await admin
+    .from('users')
+    .select('id, email, timezone, phone, phone_verified, reminder_preferences')
+    .in('id', userIds)
+    .returns<UserRow[]>();
+  const userById = new Map((users ?? []).map((u) => [u.id, u]));
+
+  let sentEmail = 0;
+  let sentSms = 0;
   const errors: string[] = [];
 
-  for (const ev of todo) {
+  for (const ev of candidates) {
     const u = userById.get(ev.user_id);
-    if (!u || !u.email_reminders_enabled || !u.email) continue;
+    if (!u) continue;
+    const prefs = u.reminder_preferences ?? DEFAULT_PREFS;
+    const wantEmail = prefs.hard_block.email === true;
+    const wantSms = prefs.hard_block.sms === true;
 
-    try {
-      await sendReminderEmail({
-        toEmail: u.email,
-        timezone: u.timezone || 'UTC',
-        event: ev,
-      });
-      // Write reminder row (best-effort dedupe via unique index).
-      const { error: insErr } = await admin.from('reminders').insert({
-        event_id: ev.id,
-        fires_at: new Date(new Date(ev.starts_at).getTime() - 5 * 60 * 1000).toISOString(),
-        channel: 'email',
-        fired: true,
-      });
-      if (insErr && !insErr.message.includes('duplicate key')) {
-        errors.push(`${ev.id}: ${insErr.message}`);
+    // Email channel.
+    if (wantEmail && u.email && !firedKey.has(`${ev.id}:email`)) {
+      try {
+        await sendReminderEmail({
+          toEmail: u.email,
+          timezone: u.timezone || 'UTC',
+          event: ev,
+        });
+        await recordReminder(admin, ev, 'email');
+        sentEmail++;
+      } catch (e) {
+        errors.push(`${ev.id} email: ${(e as Error).message}`);
       }
-      sent++;
-    } catch (e) {
-      errors.push(`${ev.id}: ${(e as Error).message}`);
+    }
+
+    // SMS channel (only if phone verified + Twilio SMS is configured).
+    if (wantSms && u.phone && u.phone_verified && !firedKey.has(`${ev.id}:sms`)) {
+      if (!env.TWILIO_MESSAGING_SERVICE_SID && !env.TWILIO_FROM_NUMBER) {
+        errors.push(
+          `${ev.id} sms: skipped \u2014 set TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER to enable SMS`,
+        );
+      } else {
+        try {
+          await sendReminderSms({
+            toPhone: u.phone,
+            timezone: u.timezone || 'UTC',
+            event: ev,
+          });
+          await recordReminder(admin, ev, 'sms');
+          sentSms++;
+        } catch (e) {
+          errors.push(`${ev.id} sms: ${(e as Error).message}`);
+        }
+      }
     }
   }
 
   return NextResponse.json({
     checked: candidates.length,
-    candidates: todo.length,
-    sent,
+    sentEmail,
+    sentSms,
     errors,
   });
+}
+
+async function recordReminder(
+  admin: ReturnType<typeof supabaseAdmin>,
+  event: EventRow,
+  channel: 'email' | 'sms',
+) {
+  const { error: insErr } = await admin.from('reminders').insert({
+    event_id: event.id,
+    fires_at: new Date(
+      new Date(event.starts_at).getTime() - 5 * 60 * 1000,
+    ).toISOString(),
+    channel,
+    fired: true,
+  });
+  if (insErr && !insErr.message.includes('duplicate key')) {
+    throw new Error(insErr.message);
+  }
+}
+
+function formatTime(starts_at: string, timezone: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(starts_at));
+}
+
+async function sendReminderSms(args: {
+  toPhone: string;
+  timezone: string;
+  event: EventRow;
+}) {
+  const { toPhone, timezone, event } = args;
+  const timeLabel = formatTime(event.starts_at, timezone);
+  const join = event.meeting_links?.find((l) => l.type !== 'phone');
+
+  // Keep SMS bodies short; Twilio charges per 160-char segment.
+  const parts = [`Plotto: ${event.title} starts at ${timeLabel}`];
+  if (event.location) parts.push(`@ ${event.location}`);
+  if (join) parts.push(join.url);
+  const body = parts.join(' \u2022 ');
+
+  await sendSms({ to: toPhone, body });
 }
 
 async function sendReminderEmail(args: {

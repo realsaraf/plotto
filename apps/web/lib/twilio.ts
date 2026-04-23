@@ -67,3 +67,60 @@ export function toE164(input: string, defaultCountry = '1'): string | null {
   if (digits.length === 11 && digits.startsWith(defaultCountry)) return `+${digits}`;
   return null;
 }
+
+/**
+ * Sends a transactional SMS via the Twilio Messages API.
+ *
+ * Uses `TWILIO_MESSAGING_SERVICE_SID` (preferred — Twilio picks the best
+ * number automatically) if set, otherwise falls back to a single
+ * `TWILIO_FROM_NUMBER`. Throws if neither is configured.
+ */
+export async function sendSms(args: {
+  to: string;
+  body: string;
+}): Promise<{ sid: string; status: string }> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const tok = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !tok) throw new Error('Twilio credentials missing');
+
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const fromNumber = process.env.TWILIO_FROM_NUMBER;
+  if (!messagingServiceSid && !fromNumber) {
+    throw new Error(
+      'TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER must be set to send SMS',
+    );
+  }
+
+  const params = new URLSearchParams({
+    To: args.to,
+    Body: args.body,
+    ...(messagingServiceSid
+      ? { MessagingServiceSid: messagingServiceSid }
+      : { From: fromNumber! }),
+  });
+
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization:
+          'Basic ' + Buffer.from(`${sid}:${tok}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params,
+    },
+  );
+  const json = (await res.json()) as {
+    sid?: string;
+    status?: string;
+    message?: string;
+    code?: number;
+  };
+  if (!res.ok) {
+    throw new Error(
+      json.message ?? `Twilio SMS send failed (${res.status})`,
+    );
+  }
+  return { sid: json.sid!, status: json.status! };
+}

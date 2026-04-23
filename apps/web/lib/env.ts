@@ -30,6 +30,12 @@ export const env = {
   OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   RESEND_API_KEY: opt(process.env.RESEND_API_KEY),
   REMINDER_FROM_EMAIL: process.env.REMINDER_FROM_EMAIL || 'Plotto <hello@getplotto.com>',
+  // Twilio SMS (transactional reminder sends — separate from Verify OTPs).
+  // At least one of MESSAGING_SERVICE_SID (preferred) or FROM_NUMBER must be
+  // set for SMS reminders to fire; cron skips SMS gracefully if neither is
+  // configured.
+  TWILIO_MESSAGING_SERVICE_SID: opt(process.env.TWILIO_MESSAGING_SERVICE_SID),
+  TWILIO_FROM_NUMBER: opt(process.env.TWILIO_FROM_NUMBER),
   CRON_SECRET: opt(process.env.CRON_SECRET),
   APP_URL: process.env.APP_URL || 'https://app.getplotto.com',
   LANGFUSE_PUBLIC_KEY: opt(process.env.LANGFUSE_PUBLIC_KEY),
