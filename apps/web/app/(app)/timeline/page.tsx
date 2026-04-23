@@ -10,17 +10,41 @@ type RawEvent = Omit<EventRow, 'people'> & {
   event_people?: { people: { id: string; name: string; color: string } | null }[] | null;
 };
 
-export default async function TimelinePage() {
+export default async function TimelinePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ person?: string }>;
+}) {
   const supabase = await supabaseServer();
-  const { data: events, error } = await supabase
+  const { person: personId } = await searchParams;
+
+  let activePerson: { id: string; name: string; color: string } | null = null;
+  if (personId) {
+    const { data: p } = await supabase
+      .from('people')
+      .select('id, name, color')
+      .eq('id', personId)
+      .maybeSingle();
+    if (p) activePerson = p;
+  }
+
+  // INNER-join when filtering by person; LEFT-join otherwise.
+  const select = personId
+    ? 'id, title, description, starts_at, ends_at, location, all_day, importance, reminder_strategy, confidence, status, meeting_links, phone_numbers, event_people!inner(person_id, people!inner(id, name, color))'
+    : 'id, title, description, starts_at, ends_at, location, all_day, importance, reminder_strategy, confidence, status, meeting_links, phone_numbers, event_people(people(id, name, color))';
+
+  let query = supabase
     .from('events')
-    .select(
-      'id, title, description, starts_at, ends_at, location, all_day, importance, reminder_strategy, confidence, status, meeting_links, phone_numbers, event_people(people(id, name, color))',
-    )
+    .select(select)
     .in('status', ['active', 'snoozed'])
     .order('starts_at', { ascending: true })
-    .limit(200)
-    .returns<RawEvent[]>();
+    .limit(200);
+
+  if (personId) {
+    query = query.eq('event_people.person_id', personId);
+  }
+
+  const { data: events, error } = await query.returns<RawEvent[]>();
 
   if (error) {
     return (
@@ -54,41 +78,53 @@ export default async function TimelinePage() {
   });
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Your timeline</h1>
-          <p className="mt-1 text-sm text-ink-500">
-            {all.length} upcoming — ordered by what matters next.
-          </p>
-        </div>
-        <Link
-          href="/capture"
-          className="rounded-xl bg-coral-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-coral-600"
-        >
-          + New capture
-        </Link>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your timeline</h1>
+        <p className="mt-1 text-sm text-ink-500">
+          {activePerson
+            ? `${all.length} ${all.length === 1 ? 'plotto' : 'plottos'} with ${activePerson.name}`
+            : `${all.length} upcoming — ordered by what matters next.`}
+        </p>
       </div>
 
-      {all.length === 0 ? <EmptyState /> : <TimelineList events={all} />}
+      {activePerson && (
+        <div className="flex items-center gap-2 rounded-xl border border-ink-100 bg-white px-3 py-2 text-sm">
+          <span className="text-ink-500">Filtered by</span>
+          <span className="inline-flex items-center rounded-full border border-coral-200 bg-coral-100 px-2 py-0.5 text-xs font-medium text-coral-800">
+            {activePerson.name}
+          </span>
+          <Link
+            href="/timeline"
+            className="ml-auto text-xs font-medium text-ink-500 hover:text-ink-900"
+          >
+            Clear filter ✕
+          </Link>
+        </div>
+      )}
+
+      {all.length === 0 ? <EmptyState filtered={!!activePerson} /> : <TimelineList events={all} />}
     </div>
   );
 }
 
-function EmptyState() {
+function EmptyState({ filtered }: { filtered: boolean }) {
   return (
-    <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 p-10 text-center">
+    <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 p-8 text-center sm:p-10">
       <div className="mx-auto mb-4 h-1.5 w-8 rounded-full bg-coral-500" />
-      <h2 className="text-lg font-semibold text-ink-900">Nothing plotted yet</h2>
+      <h2 className="text-lg font-semibold text-ink-900">
+        {filtered ? 'No plottos with this person yet' : 'Nothing plotted yet'}
+      </h2>
       <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-500">
-        Paste an email, describe something coming up, or drop any text — Plotto
-        will pull out the details.
+        {filtered
+          ? 'Try clearing the filter, or capture something new mentioning them.'
+          : 'Paste an email, describe something coming up, or drop any text — Plotto will pull out the details.'}
       </p>
       <Link
-        href="/capture"
+        href={filtered ? '/timeline' : '/capture'}
         className="mt-5 inline-flex rounded-xl bg-coral-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-coral-600"
       >
-        Make your first capture
+        {filtered ? 'Show all plottos' : 'Make your first capture'}
       </Link>
     </div>
   );
