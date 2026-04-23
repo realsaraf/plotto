@@ -68,6 +68,8 @@ async function run(req: NextRequest) {
 
   const admin = supabaseAdmin();
 
+  const debug = req.nextUrl.searchParams.get('debug') === '1';
+
   // Window: send when starts_at is between now+1m and now+6m. Cron runs every
   // minute, so a plotto starting in exactly 5 min lands once. We also pick up
   // any that the cron may have missed in the prior minute.
@@ -87,6 +89,29 @@ async function run(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  if (debug) {
+    // Also probe the broader landscape for diagnostics.
+    const { data: anyHard } = await admin
+      .from('events')
+      .select('id, title, starts_at, importance, status')
+      .eq('importance', 'hard_block')
+      .eq('status', 'active')
+      .gte('starts_at', new Date(now.getTime() - 30 * 60 * 1000).toISOString())
+      .lte('starts_at', new Date(now.getTime() + 30 * 60 * 1000).toISOString())
+      .order('starts_at', { ascending: true })
+      .limit(10);
+    return NextResponse.json({
+      now: now.toISOString(),
+      windowStart,
+      windowEnd,
+      supabaseUrl: env.SUPABASE_URL,
+      candidatesInWindow: candidates?.length ?? 0,
+      candidates,
+      hardActiveAround: anyHard,
+    });
+  }
+
   if (!candidates || candidates.length === 0) {
     return NextResponse.json({ checked: 0, sent: 0 });
   }
