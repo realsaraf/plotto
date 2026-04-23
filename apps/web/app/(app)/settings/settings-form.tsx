@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 export type WorkSchedule = {
   days: number[];
@@ -79,9 +79,36 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
   const [savingSettings, setSavingSettings] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [checkingCode, setCheckingCode] = useState(false);
+  const [removingPhone, setRemovingPhone] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verificationSent, setVerificationSent] = useState(false);
+  // Editing mode: user had a verified number and clicked "Change". We flip the
+  // verified flag locally so the input + send button reappear, but we do NOT
+  // touch the DB — the old number stays verified until a new code is accepted.
+  const [editingPhone, setEditingPhone] = useState(false);
+  // Countdown in seconds until the most-recently-sent code expires. `null`
+  // means no active code. We derive a ticking `codeSecondsLeft` from this.
+  const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
+  const [codeSecondsLeft, setCodeSecondsLeft] = useState(0);
+  const CODE_TTL_MS = 50 * 1000;
+
+  useEffect(() => {
+    if (!codeExpiresAt) {
+      setCodeSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((codeExpiresAt - Date.now()) / 1000),
+      );
+      setCodeSecondsLeft(remaining);
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [codeExpiresAt]);
 
   function toggleDay(day: number) {
     setDays((current) =>
@@ -145,7 +172,8 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
     setPhone(data.phone);
     setPhoneVerified(false);
     setVerificationSent(true);
-    setStatus(`Verification code sent to ${data.phone}.`);
+    setCodeExpiresAt(Date.now() + CODE_TTL_MS);
+    setStatus(`Verification code sent to ${data.phone}. Expires in 50 seconds.`);
     router.refresh();
   }
 
@@ -170,8 +198,55 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
 
     setPhoneVerified(true);
     setVerificationSent(false);
+    setEditingPhone(false);
+    setCodeExpiresAt(null);
     setCode('');
     setStatus('Phone number verified.');
+    router.refresh();
+  }
+
+  function startEditingPhone() {
+    setEditingPhone(true);
+    setPhoneVerified(false);
+    setVerificationSent(false);
+    setCode('');
+    setCodeExpiresAt(null);
+    setError(null);
+    setStatus(null);
+  }
+
+  async function removePhone() {
+    if (
+      !window.confirm(
+        'Remove your mobile number? SMS reminders will be disabled until you verify a new number.',
+      )
+    ) {
+      return;
+    }
+    setRemovingPhone(true);
+    setError(null);
+    setStatus(null);
+
+    const res = await fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: null }),
+    });
+    const data = await res.json();
+    setRemovingPhone(false);
+
+    if (!res.ok) {
+      setError(data.error || 'Failed to remove phone number');
+      return;
+    }
+
+    setPhone('');
+    setPhoneVerified(false);
+    setVerificationSent(false);
+    setEditingPhone(false);
+    setCode('');
+    setCodeExpiresAt(null);
+    setStatus('Mobile number removed.');
     router.refresh();
   }
 
@@ -327,7 +402,9 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
               Mobile number
             </h2>
             <p className="mt-1 text-sm text-ink-500">
-              Verify the number now so it&apos;s ready when mobile reminder delivery is added.
+              {phoneVerified
+                ? 'Used for SMS reminders based on your preferences above.'
+                : 'Verify your number to enable SMS reminders.'}
             </p>
           </div>
           <span
@@ -341,58 +418,126 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
           </span>
         </div>
 
-        <div className="space-y-4">
-          <Field label="Phone number">
-            <input
-              type="tel"
-              className="input"
-              value={phone}
-              onChange={(event) => {
-                setPhone(event.target.value);
-                setPhoneVerified(false);
-              }}
-              placeholder="(917) 555-0123"
-            />
-          </Field>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={sendCode}
-              disabled={sendingCode || !phone.trim()}
-              className="rounded-lg bg-ink-900 px-4 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {sendingCode ? 'Sending…' : verificationSent ? 'Resend code' : 'Send verification code'}
-            </button>
-            {phoneVerified && (
-              <p className="self-center text-sm text-green-700">
-                This number is already verified.
-              </p>
-            )}
-          </div>
-
-          {(verificationSent || !phoneVerified) && (
-            <div className="grid gap-4 rounded-xl border border-ink-100 bg-paper-50 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
-              <Field label="6-digit code">
-                <input
-                  inputMode="numeric"
-                  className="input"
-                  value={code}
-                  onChange={(event) => setCode(event.target.value)}
-                  placeholder="123456"
-                />
-              </Field>
+        {phoneVerified ? (
+          // VERIFIED + not editing → read-only view with Change / Remove.
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink-100 bg-paper-50 px-4 py-3">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wider text-ink-500">
+                Phone number
+              </div>
+              <div className="mt-0.5 text-lg font-semibold text-ink-900">
+                {phone}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={verifyCode}
-                disabled={checkingCode || !code.trim() || !phone.trim()}
-                className="rounded-lg bg-coral-500 px-4 py-2 text-sm font-semibold text-white hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={startEditingPhone}
+                className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-ink-300"
               >
-                {checkingCode ? 'Checking…' : 'Verify number'}
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={removePhone}
+                disabled={removingPhone}
+                className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {removingPhone ? 'Removing…' : 'Remove'}
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          // NOT VERIFIED (fresh, or editing an already-verified number).
+          <div className="space-y-4">
+            {editingPhone && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Enter a new number and verify it. Your previous verified number
+                stays active until the new one is confirmed.
+              </div>
+            )}
+
+            <Field label="Phone number">
+              <input
+                type="tel"
+                className="input"
+                value={phone}
+                onChange={(event) => {
+                  setPhone(event.target.value);
+                  setVerificationSent(false);
+                  setCodeExpiresAt(null);
+                }}
+                placeholder="(917) 555-0123"
+              />
+            </Field>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={sendCode}
+                disabled={sendingCode || !phone.trim()}
+                className="rounded-lg bg-ink-900 px-4 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sendingCode
+                  ? 'Sending…'
+                  : verificationSent
+                    ? codeSecondsLeft > 0
+                      ? `Resend code (${codeSecondsLeft}s)`
+                      : 'Resend code'
+                    : 'Send verification code'}
+              </button>
+              {editingPhone && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingPhone(false);
+                    setPhone(settings.phone);
+                    setPhoneVerified(settings.phoneVerified);
+                    setVerificationSent(false);
+                    setCode('');
+                    setCodeExpiresAt(null);
+                  }}
+                  className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm font-medium text-ink-600 hover:border-ink-300"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+
+            {verificationSent && (
+              <div className="grid gap-4 rounded-xl border border-ink-100 bg-paper-50 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                <Field
+                  label={
+                    codeSecondsLeft > 0
+                      ? `6-digit code (expires in ${codeSecondsLeft}s)`
+                      : '6-digit code (expired — resend above)'
+                  }
+                >
+                  <input
+                    inputMode="numeric"
+                    className="input"
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    placeholder="123456"
+                  />
+                </Field>
+                <button
+                  type="button"
+                  onClick={verifyCode}
+                  disabled={
+                    checkingCode ||
+                    !code.trim() ||
+                    !phone.trim() ||
+                    codeSecondsLeft === 0
+                  }
+                  className="rounded-lg bg-coral-500 px-4 py-2 text-sm font-semibold text-white hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {checkingCode ? 'Checking…' : 'Verify number'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {(error || status) && (

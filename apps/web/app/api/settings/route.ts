@@ -32,6 +32,10 @@ const ReminderPreferencesSchema = z.object({
 const PatchSchema = z.object({
   workSchedule: WorkScheduleSchema.nullable().optional(),
   reminderPreferences: ReminderPreferencesSchema.optional(),
+  // Clearing is the only phone edit we accept here. Setting a new number
+  // must go through /api/phone/start-verify so it can never be trusted until
+  // Twilio confirms it. `null` = remove the number and mark as unverified.
+  phone: z.null().optional(),
 });
 
 function normalizeDays(days: number[]) {
@@ -79,6 +83,11 @@ export async function PATCH(req: NextRequest) {
     update.email_reminders_enabled = Boolean(
       patch.reminderPreferences?.hard_block?.email,
     );
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'phone') && patch.phone === null) {
+    update.phone = null;
+    update.phone_verified = false;
   }
 
   const { data, error } = await supabase
