@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import type { MeetingLink, PersonPill, PhoneNumber } from '@/lib/types';
+import { PhoneIcon, VideoIcon } from './icons';
 
 const PILL_TONES: Record<string, string> = {
-  coral: 'bg-coral-100 text-coral-800 border-coral-200 hover:bg-coral-200',
-  amber: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200',
-  emerald: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200',
-  sky: 'bg-sky-100 text-sky-800 border-sky-200 hover:bg-sky-200',
-  violet: 'bg-violet-100 text-violet-800 border-violet-200 hover:bg-violet-200',
-  rose: 'bg-rose-100 text-rose-800 border-rose-200 hover:bg-rose-200',
-  teal: 'bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200',
-  indigo: 'bg-indigo-100 text-indigo-800 border-indigo-200 hover:bg-indigo-200',
+  coral: 'bg-coral-100 text-coral-800 border-coral-200 hover:bg-coral-200 dark:bg-coral-950 dark:text-coral-300 dark:border-coral-900 dark:hover:bg-coral-900',
+  amber: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900 dark:hover:bg-amber-900',
+  emerald: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900 dark:hover:bg-emerald-900',
+  sky: 'bg-sky-100 text-sky-800 border-sky-200 hover:bg-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-900 dark:hover:bg-sky-900',
+  violet: 'bg-violet-100 text-violet-800 border-violet-200 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-900 dark:hover:bg-violet-900',
+  rose: 'bg-rose-100 text-rose-800 border-rose-200 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-900 dark:hover:bg-rose-900',
+  teal: 'bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900 dark:hover:bg-teal-900',
+  indigo: 'bg-indigo-100 text-indigo-800 border-indigo-200 hover:bg-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-900 dark:hover:bg-indigo-900',
 };
 
 export function PersonPills({
@@ -23,9 +24,9 @@ export function PersonPills({
 }) {
   if (!people || people.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1">
       {people.map((p) => {
-        const className = `inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium transition ${
+        const className = `inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium transition ${
           PILL_TONES[p.color] ?? PILL_TONES.coral
         }`;
         if (!linkable) {
@@ -54,13 +55,13 @@ function linkLabel(link: MeetingLink): string {
   if (link.label) return link.label;
   switch (link.type) {
     case 'zoom':
-      return 'Join Zoom';
+      return 'Zoom';
     case 'meet':
-      return 'Join Meet';
+      return 'Meet';
     case 'teams':
-      return 'Join Teams';
+      return 'Teams';
     case 'webex':
-      return 'Join Webex';
+      return 'Webex';
     case 'phone':
       return 'Dial in';
     default:
@@ -71,15 +72,18 @@ function linkLabel(link: MeetingLink): string {
 export function ActionLinks({
   meetingLinks,
   phoneNumbers,
+  compact = false,
 }: {
   meetingLinks: MeetingLink[] | null | undefined;
   phoneNumbers: PhoneNumber[] | null | undefined;
+  compact?: boolean;
 }) {
   const hasMeet = meetingLinks && meetingLinks.length > 0;
   const hasPhone = phoneNumbers && phoneNumbers.length > 0;
   if (!hasMeet && !hasPhone) return null;
+  const sizing = compact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs';
   return (
-    <div className="mt-2.5 flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1">
       {hasMeet &&
         meetingLinks!.map((link) => (
           <a
@@ -87,10 +91,10 @@ export function ActionLinks({
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-lg bg-ink-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-ink-800"
+            className={`inline-flex items-center gap-1 rounded-md bg-fg ${sizing} font-medium text-surface hover:opacity-90`}
             onClick={(e) => e.stopPropagation()}
           >
-            <span aria-hidden>↗</span> {linkLabel(link)}
+            <VideoIcon size={12} /> {linkLabel(link)}
           </a>
         ))}
       {hasPhone &&
@@ -98,10 +102,10 @@ export function ActionLinks({
           <a
             key={p.number}
             href={`tel:${p.number.replace(/\s+/g, '')}`}
-            className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-xs font-medium text-ink-900 hover:border-ink-300"
+            className={`inline-flex items-center gap-1 rounded-md border border-line bg-card ${sizing} font-medium text-fg hover:border-line-strong`}
             onClick={(e) => e.stopPropagation()}
           >
-            <span aria-hidden>📞</span> {p.label ?? p.number}
+            <PhoneIcon size={12} /> {p.label ?? p.number}
           </a>
         ))}
     </div>

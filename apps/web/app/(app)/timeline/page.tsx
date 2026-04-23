@@ -36,7 +36,7 @@ export default async function TimelinePage({
   let query = supabase
     .from('events')
     .select(select)
-    .in('status', ['active', 'snoozed'])
+    .in('status', ['active', 'snoozed', 'done'])
     .order('starts_at', { ascending: true })
     .limit(200);
 
@@ -48,7 +48,7 @@ export default async function TimelinePage({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
+      <div className="rounded-xl border border-danger/30 bg-danger-soft p-5 text-sm text-danger">
         Could not load timeline: {error.message}
       </div>
     );
@@ -81,7 +81,7 @@ export default async function TimelinePage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your timeline</h1>
-        <p className="mt-1 text-sm text-ink-500">
+        <p className="mt-1 text-sm text-fg-muted">
           {activePerson
             ? `${all.length} ${all.length === 1 ? 'plotto' : 'plottos'} with ${activePerson.name}`
             : `${all.length} upcoming — ordered by what matters next.`}
@@ -89,14 +89,14 @@ export default async function TimelinePage({
       </div>
 
       {activePerson && (
-        <div className="flex items-center gap-2 rounded-xl border border-ink-100 bg-white px-3 py-2 text-sm">
-          <span className="text-ink-500">Filtered by</span>
-          <span className="inline-flex items-center rounded-full border border-coral-200 bg-coral-100 px-2 py-0.5 text-xs font-medium text-coral-800">
+        <div className="flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-sm">
+          <span className="text-fg-muted">Filtered by</span>
+          <span className="inline-flex items-center rounded-full border border-coral-200 bg-coral-100 px-2 py-0.5 text-xs font-medium text-coral-800 dark:border-coral-900 dark:bg-coral-950 dark:text-coral-300">
             {activePerson.name}
           </span>
           <Link
             href="/timeline"
-            className="ml-auto text-xs font-medium text-ink-500 hover:text-ink-900"
+            className="ml-auto text-xs font-medium text-fg-muted hover:text-fg"
           >
             Clear filter ✕
           </Link>
@@ -110,19 +110,19 @@ export default async function TimelinePage({
 
 function EmptyState({ filtered }: { filtered: boolean }) {
   return (
-    <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 p-8 text-center sm:p-10">
-      <div className="mx-auto mb-4 h-1.5 w-8 rounded-full bg-coral-500" />
-      <h2 className="text-lg font-semibold text-ink-900">
+    <div className="rounded-2xl border border-dashed border-line bg-card/60 p-8 text-center sm:p-10">
+      <div className="mx-auto mb-4 h-1.5 w-8 rounded-full bg-accent" />
+      <h2 className="text-lg font-semibold text-fg">
         {filtered ? 'No plottos with this person yet' : 'Nothing plotted yet'}
       </h2>
-      <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-500">
+      <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-muted">
         {filtered
           ? 'Try clearing the filter, or capture something new mentioning them.'
           : 'Paste an email, describe something coming up, or drop any text — Plotto will pull out the details.'}
       </p>
       <Link
         href={filtered ? '/timeline' : '/capture'}
-        className="mt-5 inline-flex rounded-xl bg-coral-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-coral-600"
+        className="mt-5 inline-flex rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-fg shadow-sm hover:bg-accent-strong"
       >
         {filtered ? 'Show all plottos' : 'Make your first capture'}
       </Link>

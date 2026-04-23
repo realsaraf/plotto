@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import { ThemePicker } from '@/components/theme-toggle';
 
 export type WorkSchedule = {
   days: number[];
@@ -252,23 +253,35 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-ink-100 bg-white p-6">
+      <section className="rounded-2xl border border-line bg-card p-6">
         <div className="mb-5">
-          <h2 className="text-xl font-semibold tracking-tight text-ink-900">
+          <h2 className="text-xl font-semibold tracking-tight text-fg">
+            Appearance
+          </h2>
+          <p className="mt-1 text-sm text-fg-muted">
+            Choose how Plotto looks. Midnight is easy on tired eyes.
+          </p>
+        </div>
+        <ThemePicker />
+      </section>
+
+      <section className="rounded-2xl border border-line bg-card p-6">
+        <div className="mb-5">
+          <h2 className="text-xl font-semibold tracking-tight text-fg">
             Default work schedule
           </h2>
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-sm text-fg-muted">
             Plotto will use this to warn when a new capture lands during work.
           </p>
         </div>
 
         <div className="space-y-4">
-          <label className="flex items-center gap-2 text-sm text-ink-700">
+          <label className="flex items-center gap-2 text-sm text-fg-muted">
             <input
               type="checkbox"
               checked={scheduleEnabled}
               onChange={(event) => setScheduleEnabled(event.target.checked)}
-              className="h-4 w-4 rounded border-ink-300 text-coral-500 focus:ring-coral-500"
+              className="h-4 w-4 rounded border-line-strong text-accent focus:ring-accent"
             />
             Turn on work-schedule conflict warnings
           </label>
@@ -284,8 +297,8 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
                   disabled={!scheduleEnabled}
                   className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
                     active
-                      ? 'bg-coral-500 text-white'
-                      : 'border border-ink-200 bg-white text-ink-600 hover:border-ink-300'
+                      ? 'bg-accent text-accent-fg'
+                      : 'border border-line-strong bg-card text-fg-muted hover:border-line-strong'
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   {day.label}
@@ -317,26 +330,26 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-ink-100 bg-white p-6">
+      <section className="rounded-2xl border border-line bg-card p-6">
         <div className="mb-5">
-          <h2 className="text-xl font-semibold tracking-tight text-ink-900">
+          <h2 className="text-xl font-semibold tracking-tight text-fg">
             Reminder preferences
           </h2>
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-sm text-fg-muted">
             Choose how Plotto reaches you for each importance level. Push
             notifications arrive once the mobile app ships; email and SMS are
             live today.
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-ink-100">
+        <div className="overflow-hidden rounded-xl border border-line">
           <div className="grid grid-cols-[1.5fr_repeat(3,1fr)] divide-y divide-ink-100 text-sm">
-            <div className="col-span-full grid grid-cols-subgrid bg-paper-50 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-ink-500">
+            <div className="col-span-full grid grid-cols-subgrid bg-surface px-4 py-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
               <div>Plotto type</div>
               {CHANNEL_COLS.map((col) => (
                 <div key={col.key} className="text-center">
                   <div>{col.label}</div>
-                  <div className="mt-0.5 text-[10px] font-normal normal-case tracking-normal text-ink-400">
+                  <div className="mt-0.5 text-[10px] font-normal normal-case tracking-normal text-fg-subtle">
                     {col.hint}
                   </div>
                 </div>
@@ -348,8 +361,8 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
                 className="col-span-full grid grid-cols-subgrid items-center px-4 py-3"
               >
                 <div>
-                  <div className="font-medium text-ink-900">{row.label}</div>
-                  <div className="mt-0.5 text-xs text-ink-500">
+                  <div className="font-medium text-fg">{row.label}</div>
+                  <div className="mt-0.5 text-xs text-fg-muted">
                     {row.sublabel}
                   </div>
                 </div>
@@ -373,7 +386,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
                         checked={reminderPreferences[row.key][col.key]}
                         disabled={disabled}
                         onChange={() => toggleChannel(row.key, col.key)}
-                        className="h-5 w-5 rounded border-ink-300 text-coral-500 focus:ring-coral-500 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="h-5 w-5 rounded border-line-strong text-accent focus:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
                       />
                     </label>
                   );
@@ -383,11 +396,11 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
           </div>
         </div>
 
-        <p className="mt-3 text-xs text-ink-500">
-          Email reminders go to <span className="font-medium text-ink-700">{settings.email || 'no email on file'}</span>.
+        <p className="mt-3 text-xs text-fg-muted">
+          Email reminders go to <span className="font-medium text-fg-muted">{settings.email || 'no email on file'}</span>.
           {phoneVerified ? (
             <>
-              {' '}SMS reminders go to <span className="font-medium text-ink-700">{phone}</span>.
+              {' '}SMS reminders go to <span className="font-medium text-fg-muted">{phone}</span>.
             </>
           ) : (
             <> Verify your mobile number below to enable SMS.</>
@@ -395,13 +408,13 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         </p>
       </section>
 
-      <section className="rounded-2xl border border-ink-100 bg-white p-6">
+      <section className="rounded-2xl border border-line bg-card p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight text-ink-900">
+            <h2 className="text-xl font-semibold tracking-tight text-fg">
               Mobile number
             </h2>
-            <p className="mt-1 text-sm text-ink-500">
+            <p className="mt-1 text-sm text-fg-muted">
               {phoneVerified
                 ? 'Used for SMS reminders based on your preferences above.'
                 : 'Verify your number to enable SMS reminders.'}
@@ -420,12 +433,12 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
 
         {phoneVerified ? (
           // VERIFIED + not editing → read-only view with Change / Remove.
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink-100 bg-paper-50 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3">
             <div>
-              <div className="text-xs font-medium uppercase tracking-wider text-ink-500">
+              <div className="text-xs font-medium uppercase tracking-wider text-fg-muted">
                 Phone number
               </div>
-              <div className="mt-0.5 text-lg font-semibold text-ink-900">
+              <div className="mt-0.5 text-lg font-semibold text-fg">
                 {phone}
               </div>
             </div>
@@ -433,7 +446,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
               <button
                 type="button"
                 onClick={startEditingPhone}
-                className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-ink-300"
+                className="rounded-lg border border-line-strong bg-card px-3 py-1.5 text-sm font-medium text-fg-muted hover:border-line-strong"
               >
                 Change
               </button>
@@ -441,7 +454,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
                 type="button"
                 onClick={removePhone}
                 disabled={removingPhone}
-                className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-red-200 bg-card px-3 py-1.5 text-sm font-medium text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {removingPhone ? 'Removing…' : 'Remove'}
               </button>
@@ -476,7 +489,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
                 type="button"
                 onClick={sendCode}
                 disabled={sendingCode || !phone.trim()}
-                className="rounded-lg bg-ink-900 px-4 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-accent-fg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {sendingCode
                   ? 'Sending…'
@@ -497,7 +510,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
                     setCode('');
                     setCodeExpiresAt(null);
                   }}
-                  className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm font-medium text-ink-600 hover:border-ink-300"
+                  className="rounded-lg border border-line-strong bg-card px-3 py-2 text-sm font-medium text-fg-muted hover:border-line-strong"
                 >
                   Cancel
                 </button>
@@ -505,7 +518,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
             </div>
 
             {verificationSent && (
-              <div className="grid gap-4 rounded-xl border border-ink-100 bg-paper-50 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
+              <div className="grid gap-4 rounded-xl border border-line bg-surface p-4 sm:grid-cols-[1fr_auto] sm:items-end">
                 <Field
                   label={
                     codeSecondsLeft > 0
@@ -530,7 +543,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
                     !phone.trim() ||
                     codeSecondsLeft === 0
                   }
-                  className="rounded-lg bg-coral-500 px-4 py-2 text-sm font-semibold text-white hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-fg hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {checkingCode ? 'Checking…' : 'Verify number'}
                 </button>
@@ -557,7 +570,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
           type="button"
           onClick={saveSettings}
           disabled={savingSettings}
-          className="rounded-xl bg-coral-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-accent-fg shadow-sm hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
         >
           {savingSettings ? 'Saving…' : 'Save settings'}
         </button>
@@ -569,7 +582,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-500">
+      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-fg-muted">
         {label}
       </label>
       {children}

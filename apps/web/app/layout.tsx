@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
 import { PostHogProvider } from './posthog-provider';
+import { ThemeProvider, themeInitScript } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
   title: 'Plotto — Your life, plotted out.',
@@ -20,9 +21,14 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="font-sans">
-        <PostHogProvider>{children}</PostHogProvider>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="font-sans bg-surface text-fg">
+        <ThemeProvider>
+          <PostHogProvider>{children}</PostHogProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

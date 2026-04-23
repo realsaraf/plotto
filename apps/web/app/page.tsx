@@ -17,7 +17,7 @@ export default async function LandingPage() {
   if (data.user) redirect('/timeline');
 
   return (
-    <main className="min-h-screen bg-paper-50 text-ink-900">
+    <main className="min-h-screen bg-surface text-fg">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-3">
           <PlottoMark className="h-9 w-9 shrink-0" />
@@ -26,13 +26,13 @@ export default async function LandingPage() {
         <nav className="flex items-center gap-3">
           <Link
             href="/sign-in"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-ink-700 hover:text-ink-900"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-fg-muted hover:text-fg"
           >
             Sign in
           </Link>
           <Link
             href="/sign-in"
-            className="rounded-lg bg-ink-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-ink-800"
+            className="rounded-lg bg-fg px-3.5 py-2 text-sm font-medium text-accent-fg hover:opacity-90"
           >
             Get started
           </Link>
@@ -40,8 +40,8 @@ export default async function LandingPage() {
       </header>
 
       <section className="mx-auto max-w-4xl px-6 pb-16 pt-10 sm:pt-20">
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-coral-200 bg-coral-50 px-3 py-1 text-xs font-medium text-coral-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-coral-500" aria-hidden />
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-coral-200 bg-accent-soft px-3 py-1 text-xs font-medium text-coral-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
           Early preview
         </div>
         <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
@@ -54,7 +54,7 @@ export default async function LandingPage() {
             />
           </span>
         </h1>
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-600">
+        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-fg-muted">
           Drop a screenshot. Paste an email. Say it out loud. Plotto quietly
           pulls out the dates, reminders, and things you&apos;d otherwise
           forget — and shows them back to you as a calm timeline you can trust.
@@ -62,13 +62,13 @@ export default async function LandingPage() {
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
           <Link
             href="/sign-in"
-            className="inline-flex items-center justify-center rounded-xl bg-coral-500 px-5 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-coral-600"
+            className="inline-flex items-center justify-center rounded-xl bg-accent px-5 py-3 text-base font-semibold text-accent-fg shadow-sm transition hover:bg-accent-strong"
           >
             Try it free
           </Link>
           <Link
             href="/sign-in"
-            className="inline-flex items-center justify-center rounded-xl border border-ink-200 bg-white px-5 py-3 text-base font-semibold text-ink-900 hover:border-ink-300"
+            className="inline-flex items-center justify-center rounded-xl border border-line-strong bg-card px-5 py-3 text-base font-semibold text-fg hover:border-line-strong"
           >
             I have an account
           </Link>
@@ -92,30 +92,30 @@ export default async function LandingPage() {
         ].map((f) => (
           <div
             key={f.title}
-            className="rounded-2xl border border-ink-100 bg-white p-5"
+            className="rounded-2xl border border-line bg-card p-5"
           >
-            <div className="mb-3 h-1.5 w-8 rounded-full bg-coral-500" aria-hidden />
-            <h3 className="mb-1.5 text-base font-semibold text-ink-900">
+            <div className="mb-3 h-1.5 w-8 rounded-full bg-accent" aria-hidden />
+            <h3 className="mb-1.5 text-base font-semibold text-fg">
               {f.title}
             </h3>
-            <p className="text-sm leading-relaxed text-ink-600">{f.body}</p>
+            <p className="text-sm leading-relaxed text-fg-muted">{f.body}</p>
           </div>
         ))}
       </section>
 
-      <footer className="border-t border-ink-100 bg-white/50">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-ink-500">
+      <footer className="border-t border-line bg-card/50">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-fg-muted">
           <span>© {new Date().getFullYear()} Plotto · Early preview</span>
           <nav className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-ink-900">
+            <Link href="/privacy" className="hover:text-fg">
               Privacy
             </Link>
-            <Link href="/tos" className="hover:text-ink-900">
+            <Link href="/tos" className="hover:text-fg">
               Terms
             </Link>
             <a
               href="mailto:support@getplotto.com"
-              className="hover:text-ink-900"
+              className="hover:text-fg"
             >
               Contact
             </a>

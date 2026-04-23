@@ -14,29 +14,29 @@ export default async function SignInPage({
   const { error } = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-paper-50 px-4 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-surface px-4 py-12">
       <div className="w-full max-w-md">
-        <Link href="/" className="mb-8 flex items-center gap-3 text-ink-900">
+        <Link href="/" className="mb-8 flex items-center gap-3 text-fg">
           <PlottoMark className="h-10 w-10 shrink-0" />
           <span className="text-xl font-semibold tracking-tight">Plotto</span>
         </Link>
-        <div className="rounded-2xl border border-ink-100 bg-white p-8 shadow-sm">
-          <h1 className="mb-2 text-2xl font-semibold tracking-tight text-ink-900">
+        <div className="rounded-2xl border border-line bg-card p-8 shadow-sm">
+          <h1 className="mb-2 text-2xl font-semibold tracking-tight text-fg">
             Welcome back
           </h1>
-          <p className="mb-6 text-sm text-ink-500">
+          <p className="mb-6 text-sm text-fg-muted">
             Use Google, Apple, or a magic link. If the email is the same and verified,
             Supabase will keep it in the same Plotto account.
           </p>
           <SignInForm initialError={error ?? null} />
         </div>
-        <p className="mt-6 text-center text-xs text-ink-400">
+        <p className="mt-6 text-center text-xs text-fg-subtle">
           By signing in you agree to Plotto&apos;s{' '}
-          <Link href="/tos" className="underline hover:text-ink-700">
+          <Link href="/tos" className="underline hover:text-fg-muted">
             Terms
           </Link>{' '}
           and{' '}
-          <Link href="/privacy" className="underline hover:text-ink-700">
+          <Link href="/privacy" className="underline hover:text-fg-muted">
             Privacy Policy
           </Link>
           .

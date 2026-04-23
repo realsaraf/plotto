@@ -12,7 +12,7 @@ const EFFECTIVE = 'April 2026';
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-paper-50 text-ink-900">
+    <main className="min-h-screen bg-surface text-fg">
       <header className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6">
         <Link href="/" className="flex items-center gap-3">
           <PlottoMark className="h-8 w-8 shrink-0" />
@@ -20,7 +20,7 @@ export default function TermsPage() {
         </Link>
         <Link
           href="/"
-          className="text-sm font-medium text-ink-600 hover:text-ink-900"
+          className="text-sm font-medium text-fg-muted hover:text-fg"
         >
           ← Back
         </Link>
@@ -30,9 +30,9 @@ export default function TermsPage() {
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           Terms of Service
         </h1>
-        <p className="mt-2 text-sm text-ink-500">Effective {EFFECTIVE}</p>
+        <p className="mt-2 text-sm text-fg-muted">Effective {EFFECTIVE}</p>
 
-        <div className="prose prose-ink mt-10 space-y-6 text-[15px] leading-relaxed text-ink-700">
+        <div className="prose prose-ink mt-10 space-y-6 text-[15px] leading-relaxed text-fg-muted">
           <p>
             These terms govern your use of Plotto (&quot;the service&quot;). By
             creating an account or signing in, you agree to them. Plotto is an
@@ -40,13 +40,13 @@ export default function TermsPage() {
             below — it matters.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">Your account</h2>
+          <h2 className="text-xl font-semibold text-fg">Your account</h2>
           <p>
             You are responsible for the activity on your account. Keep your
             sign-in method secure. One person per account.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">Acceptable use</h2>
+          <h2 className="text-xl font-semibold text-fg">Acceptable use</h2>
           <ul className="list-disc space-y-2 pl-5">
             <li>Do not use Plotto to harass, defraud, or harm anyone.</li>
             <li>Do not upload content you do not have the right to share.</li>
@@ -60,14 +60,14 @@ export default function TermsPage() {
             </li>
           </ul>
 
-          <h2 className="text-xl font-semibold text-ink-900">Your content</h2>
+          <h2 className="text-xl font-semibold text-fg">Your content</h2>
           <p>
             You own what you capture into Plotto. You grant us a limited license
             to store and process it solely so the service can work for you
             (extraction, search, reminders, backups).
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">
+          <h2 className="text-xl font-semibold text-fg">
             Early preview — rough edges
           </h2>
           <p>
@@ -76,15 +76,15 @@ export default function TermsPage() {
             Keep a backup of anything irreplaceable.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">Termination</h2>
+          <h2 className="text-xl font-semibold text-fg">Termination</h2>
           <p>
             You can close your account at any time from{' '}
-            <Link href="/settings" className="text-coral-600 underline">
+            <Link href="/settings" className="text-accent underline">
               Settings
             </Link>{' '}
             or by emailing{' '}
             <a
-              className="text-coral-600 underline"
+              className="text-accent underline"
               href="mailto:support@getplotto.com"
             >
               support@getplotto.com
@@ -93,7 +93,7 @@ export default function TermsPage() {
             put the service at risk.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">
+          <h2 className="text-xl font-semibold text-fg">
             Disclaimers and liability
           </h2>
           <p>
@@ -103,7 +103,7 @@ export default function TermsPage() {
             terms limits liability that cannot be limited under applicable law.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">
+          <h2 className="text-xl font-semibold text-fg">
             Changes to the service and these terms
           </h2>
           <p>
@@ -112,11 +112,11 @@ export default function TermsPage() {
             use after a change means you accept the new terms.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">Contact</h2>
+          <h2 className="text-xl font-semibold text-fg">Contact</h2>
           <p>
             Questions?{' '}
             <a
-              className="text-coral-600 underline"
+              className="text-accent underline"
               href="mailto:support@getplotto.com"
             >
               support@getplotto.com
@@ -126,14 +126,14 @@ export default function TermsPage() {
         </div>
       </article>
 
-      <footer className="border-t border-ink-100 bg-white/50">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6 text-xs text-ink-500">
+      <footer className="border-t border-line bg-card/50">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6 text-xs text-fg-muted">
           <span>© {new Date().getFullYear()} Plotto</span>
           <div className="flex gap-4">
-            <Link href="/privacy" className="hover:text-ink-900">
+            <Link href="/privacy" className="hover:text-fg">
               Privacy
             </Link>
-            <Link href="/tos" className="hover:text-ink-900">
+            <Link href="/tos" className="hover:text-fg">
               Terms
             </Link>
           </div>

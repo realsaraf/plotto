@@ -48,7 +48,7 @@ export default async function SettingsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-ink-500">
+        <p className="mt-1 text-sm text-fg-muted">
           Set your default work hours, reminder preferences, and the phone number
           you&apos;ll use for future mobile reminder flows.
         </p>

@@ -51,13 +51,13 @@ export default async function EventDetailPage({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link href="/timeline" className="mb-4 inline-flex text-sm text-ink-500 hover:text-ink-900">
+      <Link href="/timeline" className="mb-4 inline-flex text-sm text-fg-muted hover:text-fg">
         ← Back to timeline
       </Link>
       {(people.length > 0 ||
         (event.meeting_links && event.meeting_links.length > 0) ||
         (event.phone_numbers && event.phone_numbers.length > 0)) && (
-        <div className="mb-4 rounded-2xl border border-ink-100 bg-white p-4">
+        <div className="mb-4 rounded-2xl border border-line bg-card p-4">
           <PersonPills people={people} />
           <ActionLinks
             meetingLinks={event.meeting_links}

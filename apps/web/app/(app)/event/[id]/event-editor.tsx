@@ -66,7 +66,7 @@ export default function EventEditor({ event }: { event: EventRow }) {
   }
 
   return (
-    <div className="rounded-2xl border border-ink-100 bg-white p-6">
+    <div className="rounded-2xl border border-line bg-card p-6">
       <h1 className="mb-5 text-xl font-semibold tracking-tight">Edit plotto</h1>
       <div className="space-y-4">
         <Field label="Title">
@@ -109,12 +109,12 @@ export default function EventEditor({ event }: { event: EventRow }) {
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm text-ink-700">
+          <label className="flex items-center gap-2 text-sm text-fg-muted">
             <input
               type="checkbox"
               checked={allDay}
               onChange={(e) => setAllDay(e.target.checked)}
-              className="h-4 w-4 rounded border-ink-300 text-coral-500 focus:ring-coral-500"
+              className="h-4 w-4 rounded border-line-strong text-accent focus:ring-coral-500"
             />
             All day
           </label>
@@ -148,14 +148,14 @@ export default function EventEditor({ event }: { event: EventRow }) {
           <div className="flex gap-2">
             <button
               onClick={() => router.back()}
-              className="rounded-lg px-3.5 py-2 text-sm font-medium text-ink-600 hover:text-ink-900"
+              className="rounded-lg px-3.5 py-2 text-sm font-medium text-fg-muted hover:text-fg"
             >
               Cancel
             </button>
             <button
               onClick={save}
               disabled={saving || deleting}
-              className="rounded-lg bg-coral-500 px-4 py-2 text-sm font-semibold text-white hover:bg-coral-600 disabled:opacity-50"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-fg hover:bg-accent-strong disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save changes'}
             </button>
@@ -169,7 +169,7 @@ export default function EventEditor({ event }: { event: EventRow }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-500">
+      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-fg-muted">
         {label}
       </label>
       {children}

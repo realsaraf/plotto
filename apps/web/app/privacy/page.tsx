@@ -12,7 +12,7 @@ const EFFECTIVE = 'April 2026';
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-paper-50 text-ink-900">
+    <main className="min-h-screen bg-surface text-fg">
       <header className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6">
         <Link href="/" className="flex items-center gap-3">
           <PlottoMark className="h-8 w-8 shrink-0" />
@@ -20,7 +20,7 @@ export default function PrivacyPage() {
         </Link>
         <Link
           href="/"
-          className="text-sm font-medium text-ink-600 hover:text-ink-900"
+          className="text-sm font-medium text-fg-muted hover:text-fg"
         >
           ← Back
         </Link>
@@ -30,16 +30,16 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           Privacy Policy
         </h1>
-        <p className="mt-2 text-sm text-ink-500">Effective {EFFECTIVE}</p>
+        <p className="mt-2 text-sm text-fg-muted">Effective {EFFECTIVE}</p>
 
-        <div className="prose prose-ink mt-10 space-y-6 text-[15px] leading-relaxed text-ink-700">
+        <div className="prose prose-ink mt-10 space-y-6 text-[15px] leading-relaxed text-fg-muted">
           <p>
             Plotto is an early-preview personal timeline assistant. This policy
             explains what we collect, why, and how to get rid of it. Plain
             language only — no dark patterns.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">What we collect</h2>
+          <h2 className="text-xl font-semibold text-fg">What we collect</h2>
           <ul className="list-disc space-y-2 pl-5">
             <li>
               <strong>Account identifiers.</strong> Your email address and, if
@@ -65,7 +65,7 @@ export default function PrivacyPage() {
             </li>
           </ul>
 
-          <h2 className="text-xl font-semibold text-ink-900">
+          <h2 className="text-xl font-semibold text-fg">
             Why we collect it
           </h2>
           <p>
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
             captured content to train public models.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">
+          <h2 className="text-xl font-semibold text-fg">
             Who processes it
           </h2>
           <ul className="list-disc space-y-2 pl-5">
@@ -104,18 +104,18 @@ export default function PrivacyPage() {
             </li>
           </ul>
 
-          <h2 className="text-xl font-semibold text-ink-900">Cookies</h2>
+          <h2 className="text-xl font-semibold text-fg">Cookies</h2>
           <p>
             Plotto uses strictly-necessary cookies for Supabase authentication,
             plus a PostHog cookie for product analytics. No advertising cookies.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">Your choices</h2>
+          <h2 className="text-xl font-semibold text-fg">Your choices</h2>
           <ul className="list-disc space-y-2 pl-5">
             <li>
               You can export or delete your data at any time by emailing{' '}
               <a
-                className="text-coral-600 underline"
+                className="text-accent underline"
                 href="mailto:privacy@getplotto.com"
               >
                 privacy@getplotto.com
@@ -128,17 +128,17 @@ export default function PrivacyPage() {
             </li>
             <li>
               You can turn off phone or email reminders from{' '}
-              <Link href="/settings" className="text-coral-600 underline">
+              <Link href="/settings" className="text-accent underline">
                 Settings
               </Link>
               .
             </li>
           </ul>
 
-          <h2 className="text-xl font-semibold text-ink-900">Children</h2>
+          <h2 className="text-xl font-semibold text-fg">Children</h2>
           <p>Plotto is not directed at children under 13 and should not be used by them.</p>
 
-          <h2 className="text-xl font-semibold text-ink-900">
+          <h2 className="text-xl font-semibold text-fg">
             Changes to this policy
           </h2>
           <p>
@@ -147,11 +147,11 @@ export default function PrivacyPage() {
             you open Plotto.
           </p>
 
-          <h2 className="text-xl font-semibold text-ink-900">Contact</h2>
+          <h2 className="text-xl font-semibold text-fg">Contact</h2>
           <p>
             Questions?{' '}
             <a
-              className="text-coral-600 underline"
+              className="text-accent underline"
               href="mailto:privacy@getplotto.com"
             >
               privacy@getplotto.com
@@ -161,14 +161,14 @@ export default function PrivacyPage() {
         </div>
       </article>
 
-      <footer className="border-t border-ink-100 bg-white/50">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6 text-xs text-ink-500">
+      <footer className="border-t border-line bg-card/50">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-6 text-xs text-fg-muted">
           <span>© {new Date().getFullYear()} Plotto</span>
           <div className="flex gap-4">
-            <Link href="/privacy" className="hover:text-ink-900">
+            <Link href="/privacy" className="hover:text-fg">
               Privacy
             </Link>
-            <Link href="/tos" className="hover:text-ink-900">
+            <Link href="/tos" className="hover:text-fg">
               Terms
             </Link>
           </div>

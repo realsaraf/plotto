@@ -10,6 +10,12 @@ import {
   normalizePersonName,
   type WorkSchedule,
 } from '@/lib/plotto-helpers';
+import {
+  extractTextFromFile,
+  composeRawContent,
+  FileTooLargeError,
+  UnsupportedFileError,
+} from '@/lib/file-extract';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,6 +35,52 @@ type PersistedPlotto = {
   conflictsWithWorkSchedule: boolean;
 };
 
+/** Parse JSON body OR multipart form data into the same shape. */
+async function readInput(req: NextRequest, openaiApiKey: string): Promise<{
+  rawContent: string;
+  source: 'share_sheet' | 'voice' | 'manual' | 'email' | 'screenshot';
+  timezone: string;
+}> {
+  const contentType = req.headers.get('content-type') ?? '';
+
+  if (contentType.includes('multipart/form-data')) {
+    const form = await req.formData();
+    const typed = (form.get('rawContent') as string | null) ?? '';
+    const timezone = (form.get('timezone') as string | null) ?? 'UTC';
+    const sourceStr = (form.get('source') as string | null) ?? 'manual';
+    const source = (
+      ['share_sheet', 'voice', 'manual', 'email', 'screenshot'].includes(sourceStr)
+        ? sourceStr
+        : 'manual'
+    ) as 'share_sheet' | 'voice' | 'manual' | 'email' | 'screenshot';
+
+    const file = form.get('file');
+    let extracted: Awaited<ReturnType<typeof extractTextFromFile>> | undefined;
+    if (file && file instanceof File && file.size > 0) {
+      extracted = await extractTextFromFile(file, { openaiApiKey });
+    }
+
+    const rawContent = composeRawContent({ typed, file: extracted });
+    if (!rawContent) {
+      throw new Error('No text extracted from input');
+    }
+
+    // For images we override source to screenshot so analytics + capture
+    // history reflect the actual provenance.
+    const finalSource =
+      extracted?.source === 'image'
+        ? ('screenshot' as const)
+        : extracted
+          ? ('email' as const) // doc/text uploads treated as email-like blobs
+          : source;
+
+    return { rawContent, source: finalSource, timezone };
+  }
+
+  const json = await req.json();
+  return BodySchema.parse(json);
+}
+
 export async function POST(req: NextRequest) {
   if (!env.OPENAI_API_KEY) {
     return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 });
@@ -41,8 +93,20 @@ export async function POST(req: NextRequest) {
 
   let body;
   try {
-    body = BodySchema.parse(await req.json());
+    body = await readInput(req, env.OPENAI_API_KEY);
   } catch (e) {
+    if (e instanceof FileTooLargeError) {
+      return NextResponse.json(
+        { error: `File too large (${(e.bytes / 1024).toFixed(0)} KB > ${(e.limit / 1024).toFixed(0)} KB limit)` },
+        { status: 413 },
+      );
+    }
+    if (e instanceof UnsupportedFileError) {
+      return NextResponse.json(
+        { error: `Unsupported file type: ${e.mime}. Use PDF, DOCX, TXT, or an image.` },
+        { status: 415 },
+      );
+    }
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });
   }
 

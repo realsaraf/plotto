@@ -48,15 +48,15 @@ export default async function PeoplePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">People</h1>
-        <p className="mt-1 text-sm text-ink-500">
+        <p className="mt-1 text-sm text-fg-muted">
           Everyone Plotto has noticed in your captures. Tap a name to filter your timeline.
         </p>
       </div>
 
       {people.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-ink-200 bg-white/60 p-10 text-center">
-          <h2 className="text-lg font-semibold text-ink-900">No people yet</h2>
-          <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-500">
+        <div className="rounded-2xl border border-dashed border-line-strong bg-card/60 p-10 text-center">
+          <h2 className="text-lg font-semibold text-fg">No people yet</h2>
+          <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-muted">
             Mention someone by name in a capture (e.g. &ldquo;coffee with Sarah Tuesday&rdquo;)
             and they&rsquo;ll appear here.
           </p>
@@ -67,7 +67,7 @@ export default async function PeoplePage() {
             <Link
               key={p.id}
               href={`/timeline?person=${p.id}`}
-              className="flex items-center justify-between rounded-xl border border-ink-100 bg-white p-3 transition hover:border-ink-200"
+              className="flex items-center justify-between rounded-xl border border-line bg-card p-3 transition hover:border-line-strong"
             >
               <span className="flex items-center gap-2 min-w-0">
                 <span
@@ -78,10 +78,10 @@ export default async function PeoplePage() {
                   {p.name}
                 </span>
                 {p.notes && (
-                  <span className="truncate text-xs text-ink-500">{p.notes}</span>
+                  <span className="truncate text-xs text-fg-muted">{p.notes}</span>
                 )}
               </span>
-              <span className="shrink-0 text-xs tabular-nums text-ink-500">
+              <span className="shrink-0 text-xs tabular-nums text-fg-muted">
                 {p.count} {p.count === 1 ? 'plotto' : 'plottos'}
               </span>
             </Link>
