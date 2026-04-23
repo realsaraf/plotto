@@ -1,30 +1,49 @@
+import Link from 'next/link';
 import type { MeetingLink, PersonPill, PhoneNumber } from '@/lib/types';
 
 const PILL_TONES: Record<string, string> = {
-  coral: 'bg-coral-100 text-coral-800 border-coral-200',
-  amber: 'bg-amber-100 text-amber-800 border-amber-200',
-  emerald: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  sky: 'bg-sky-100 text-sky-800 border-sky-200',
-  violet: 'bg-violet-100 text-violet-800 border-violet-200',
-  rose: 'bg-rose-100 text-rose-800 border-rose-200',
-  teal: 'bg-teal-100 text-teal-800 border-teal-200',
-  indigo: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  coral: 'bg-coral-100 text-coral-800 border-coral-200 hover:bg-coral-200',
+  amber: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200',
+  emerald: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200',
+  sky: 'bg-sky-100 text-sky-800 border-sky-200 hover:bg-sky-200',
+  violet: 'bg-violet-100 text-violet-800 border-violet-200 hover:bg-violet-200',
+  rose: 'bg-rose-100 text-rose-800 border-rose-200 hover:bg-rose-200',
+  teal: 'bg-teal-100 text-teal-800 border-teal-200 hover:bg-teal-200',
+  indigo: 'bg-indigo-100 text-indigo-800 border-indigo-200 hover:bg-indigo-200',
 };
 
-export function PersonPills({ people }: { people: PersonPill[] | null | undefined }) {
+export function PersonPills({
+  people,
+  linkable = true,
+}: {
+  people: PersonPill[] | null | undefined;
+  linkable?: boolean;
+}) {
   if (!people || people.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
-      {people.map((p) => (
-        <span
-          key={p.id}
-          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
-            PILL_TONES[p.color] ?? PILL_TONES.coral
-          }`}
-        >
-          {p.name}
-        </span>
-      ))}
+      {people.map((p) => {
+        const className = `inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium transition ${
+          PILL_TONES[p.color] ?? PILL_TONES.coral
+        }`;
+        if (!linkable) {
+          return (
+            <span key={p.id} className={className}>
+              {p.name}
+            </span>
+          );
+        }
+        return (
+          <Link
+            key={p.id}
+            href={`/timeline?person=${p.id}`}
+            className={className}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {p.name}
+          </Link>
+        );
+      })}
     </div>
   );
 }
