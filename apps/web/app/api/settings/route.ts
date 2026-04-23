@@ -17,9 +17,21 @@ const WorkScheduleSchema = z
     path: ['end'],
   });
 
+const ChannelPrefs = z.object({
+  push: z.boolean(),
+  email: z.boolean(),
+  sms: z.boolean(),
+});
+
+const ReminderPreferencesSchema = z.object({
+  ambient: ChannelPrefs,
+  soft_block: ChannelPrefs,
+  hard_block: ChannelPrefs,
+});
+
 const PatchSchema = z.object({
   workSchedule: WorkScheduleSchema.nullable().optional(),
-  emailRemindersEnabled: z.boolean().optional(),
+  reminderPreferences: ReminderPreferencesSchema.optional(),
 });
 
 function normalizeDays(days: number[]) {
@@ -59,15 +71,21 @@ export async function PATCH(req: NextRequest) {
       : null;
   }
 
-  if (Object.prototype.hasOwnProperty.call(patch, 'emailRemindersEnabled')) {
-    update.email_reminders_enabled = patch.emailRemindersEnabled;
+  if (Object.prototype.hasOwnProperty.call(patch, 'reminderPreferences')) {
+    update.reminder_preferences = patch.reminderPreferences;
+    // Keep the legacy boolean in sync so any older code path that still
+    // reads `email_reminders_enabled` stays consistent with what the user
+    // just picked for hard_block email.
+    update.email_reminders_enabled = Boolean(
+      patch.reminderPreferences?.hard_block?.email,
+    );
   }
 
   const { data, error } = await supabase
     .from('users')
     .update(update)
     .eq('id', user.id)
-    .select('work_schedule, email_reminders_enabled')
+    .select('work_schedule, reminder_preferences, email_reminders_enabled')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

@@ -9,6 +9,16 @@ export type WorkSchedule = {
   end: string;
 };
 
+export type Importance = 'ambient' | 'soft_block' | 'hard_block';
+export type Channel = 'push' | 'email' | 'sms';
+export type ReminderPreferences = Record<Importance, Record<Channel, boolean>>;
+
+export const DEFAULT_REMINDER_PREFERENCES: ReminderPreferences = {
+  ambient:    { push: false, email: false, sms: false },
+  soft_block: { push: true,  email: false, sms: false },
+  hard_block: { push: true,  email: true,  sms: false },
+};
+
 type SettingsFormProps = {
   settings: {
     email: string;
@@ -16,9 +26,21 @@ type SettingsFormProps = {
     hasSavedWorkSchedule: boolean;
     phone: string;
     phoneVerified: boolean;
-    emailRemindersEnabled: boolean;
+    reminderPreferences: ReminderPreferences;
   };
 };
+
+const IMPORTANCE_ROWS: { key: Importance; label: string; sublabel: string }[] = [
+  { key: 'hard_block', label: 'Hard plotto',   sublabel: 'Must not miss — meetings, appointments, deadlines.' },
+  { key: 'soft_block', label: 'Medium plotto', sublabel: 'Prefers your attention but schedulable around.' },
+  { key: 'ambient',    label: 'Soft plotto',   sublabel: 'Loose context — nice to know, no strict time.' },
+];
+
+const CHANNEL_COLS: { key: Channel; label: string; hint: string }[] = [
+  { key: 'push',  label: 'Push',  hint: 'Mobile / browser notification' },
+  { key: 'email', label: 'Email', hint: 'Sent 5 min before' },
+  { key: 'sms',   label: 'SMS',   hint: 'Text message to your phone' },
+];
 
 const dayOptions = [
   { value: 1, label: 'Mon' },
@@ -38,9 +60,19 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
   const [days, setDays] = useState<number[]>(settings.workSchedule.days);
   const [start, setStart] = useState(settings.workSchedule.start);
   const [end, setEnd] = useState(settings.workSchedule.end);
-  const [emailRemindersEnabled, setEmailRemindersEnabled] = useState(
-    settings.emailRemindersEnabled,
+  const [reminderPreferences, setReminderPreferences] = useState<ReminderPreferences>(
+    settings.reminderPreferences,
   );
+
+  function toggleChannel(importance: Importance, channel: Channel) {
+    setReminderPreferences((current) => ({
+      ...current,
+      [importance]: {
+        ...current[importance],
+        [channel]: !current[importance][channel],
+      },
+    }));
+  }
   const [phone, setPhone] = useState(settings.phone);
   const [phoneVerified, setPhoneVerified] = useState(settings.phoneVerified);
   const [code, setCode] = useState('');
@@ -75,7 +107,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         workSchedule: scheduleEnabled ? { days, start, end } : null,
-        emailRemindersEnabled,
+        reminderPreferences,
       }),
     });
 
@@ -216,24 +248,76 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
             Reminder preferences
           </h2>
           <p className="mt-1 text-sm text-ink-500">
-            Email reminders will be used for `hard_block` plottos once the delivery job is wired.
+            Choose how Plotto reaches you for each importance level. Push
+            notifications arrive once the mobile app ships; email and SMS are
+            live today.
           </p>
         </div>
 
-        <label className="flex items-start gap-3 rounded-xl border border-ink-100 bg-paper-50 px-4 py-3 text-sm text-ink-700">
-          <input
-            type="checkbox"
-            checked={emailRemindersEnabled}
-            onChange={(event) => setEmailRemindersEnabled(event.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-ink-300 text-coral-500 focus:ring-coral-500"
-          />
-          <span>
-            Send a reminder email 5 minutes before any hard plotto.
-            <span className="mt-1 block text-xs text-ink-500">
-              Email address: {settings.email || 'No email found'}
-            </span>
-          </span>
-        </label>
+        <div className="overflow-hidden rounded-xl border border-ink-100">
+          <div className="grid grid-cols-[1.5fr_repeat(3,1fr)] divide-y divide-ink-100 text-sm">
+            <div className="col-span-full grid grid-cols-subgrid bg-paper-50 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-ink-500">
+              <div>Plotto type</div>
+              {CHANNEL_COLS.map((col) => (
+                <div key={col.key} className="text-center">
+                  <div>{col.label}</div>
+                  <div className="mt-0.5 text-[10px] font-normal normal-case tracking-normal text-ink-400">
+                    {col.hint}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {IMPORTANCE_ROWS.map((row) => (
+              <div
+                key={row.key}
+                className="col-span-full grid grid-cols-subgrid items-center px-4 py-3"
+              >
+                <div>
+                  <div className="font-medium text-ink-900">{row.label}</div>
+                  <div className="mt-0.5 text-xs text-ink-500">
+                    {row.sublabel}
+                  </div>
+                </div>
+                {CHANNEL_COLS.map((col) => {
+                  const disabled =
+                    (col.key === 'sms' && !phoneVerified) ||
+                    col.key === 'push';
+                  const title = col.key === 'push'
+                    ? 'Push notifications will activate when the mobile app ships.'
+                    : col.key === 'sms' && !phoneVerified
+                      ? 'Verify your mobile number below to enable SMS.'
+                      : '';
+                  return (
+                    <label
+                      key={col.key}
+                      className="flex items-center justify-center"
+                      title={title}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={reminderPreferences[row.key][col.key]}
+                        disabled={disabled}
+                        onChange={() => toggleChannel(row.key, col.key)}
+                        className="h-5 w-5 rounded border-ink-300 text-coral-500 focus:ring-coral-500 disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs text-ink-500">
+          Email reminders go to <span className="font-medium text-ink-700">{settings.email || 'no email on file'}</span>.
+          {phoneVerified ? (
+            <>
+              {' '}SMS reminders go to <span className="font-medium text-ink-700">{phone}</span>.
+            </>
+          ) : (
+            <> Verify your mobile number below to enable SMS.</>
+          )}
+        </p>
       </section>
 
       <section className="rounded-2xl border border-ink-100 bg-white p-6">

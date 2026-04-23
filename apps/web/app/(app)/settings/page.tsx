@@ -1,6 +1,10 @@
 import { redirect } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase/server';
-import SettingsForm, { type WorkSchedule } from './settings-form';
+import SettingsForm, {
+  DEFAULT_REMINDER_PREFERENCES,
+  type ReminderPreferences,
+  type WorkSchedule,
+} from './settings-form';
 
 export const metadata = { title: 'Settings · Plotto' };
 export const dynamic = 'force-dynamic';
@@ -10,7 +14,7 @@ type SettingsRow = {
   work_schedule: WorkSchedule | null;
   phone: string | null;
   phone_verified: boolean | null;
-  email_reminders_enabled: boolean | null;
+  reminder_preferences: ReminderPreferences | null;
 };
 
 const defaultSchedule: WorkSchedule = {
@@ -28,7 +32,7 @@ export default async function SettingsPage() {
 
   const { data, error } = await supabase
     .from('users')
-    .select('email, work_schedule, phone, phone_verified, email_reminders_enabled')
+    .select('email, work_schedule, phone, phone_verified, reminder_preferences')
     .eq('id', user.id)
     .maybeSingle<SettingsRow>();
 
@@ -57,7 +61,8 @@ export default async function SettingsPage() {
           hasSavedWorkSchedule: Boolean(data?.work_schedule),
           phone: data?.phone ?? '',
           phoneVerified: Boolean(data?.phone_verified),
-          emailRemindersEnabled: data?.email_reminders_enabled ?? true,
+          reminderPreferences:
+            data?.reminder_preferences ?? DEFAULT_REMINDER_PREFERENCES,
         }}
       />
     </div>
