@@ -1,7 +1,6 @@
-import { MongoClient } from "mongodb";
+import { MongoClient, type Db } from "mongodb";
 
 declare global {
-  // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
@@ -28,6 +27,13 @@ function getClientPromise(): Promise<MongoClient> {
 
   const client = new MongoClient(uri, options);
   return client.connect();
+}
+
+/** Return the MongoDB database handle. */
+export async function getDb(): Promise<Db> {
+  const dbName = process.env.MONGODB_DB ?? "toatre_prod";
+  const client = await getClientPromise();
+  return client.db(dbName);
 }
 
 // Export a getter so the connection is established lazily at request time,
