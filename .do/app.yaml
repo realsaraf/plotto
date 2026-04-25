@@ -106,24 +106,36 @@ jobs:
       repo: realsaraf/toatre
       branch: main
     source_dir: web
-    build_command: npm ci && npm run build
-    run_command: npm run job:fire-pings
+    build_command: npm ci
+    run_command: node scripts/fire-pings.mjs
     instance_count: 1
     instance_size_slug: basic-xxs
     kind: CRON
     cron: "* * * * *"
+    envs:
+      - key: TOATRE_API_URL
+        value: https://toatre.com
+      - key: CRON_SECRET
+        scope: RUN_TIME
+        type: SECRET
 
   - name: cleanup-captures
     github:
       repo: realsaraf/toatre
       branch: main
     source_dir: web
-    build_command: npm ci && npm run build
-    run_command: npm run job:cleanup-captures
+    build_command: npm ci
+    run_command: node scripts/cleanup-captures.mjs
     instance_count: 1
     instance_size_slug: basic-xxs
     kind: CRON
     cron: "0 3 * * *"
+    envs:
+      - key: TOATRE_API_URL
+        value: https://toatre.com
+      - key: CRON_SECRET
+        scope: RUN_TIME
+        type: SECRET
 
 # ─── Static site (marketing) — optional, can be added later ──────────────────
 # static_sites:

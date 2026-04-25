@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "job:fire-pings": "node scripts/fire-pings.mjs",
+    "job:cleanup-captures": "node scripts/cleanup-captures.mjs"
   },
   "dependencies": {
     "firebase": "^12.12.1",
