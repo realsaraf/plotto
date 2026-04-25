@@ -13,10 +13,20 @@
 
 ## 📊 Status Summary
 
-**Last updated:** 2026-04-25 (project kicked off, greenfield)
-**Current phase:** Phase 0 — Accounts + scaffold (in progress)
+**Last updated:** 2026-04-25
+**Current phase:** Phase 0 — Accounts + scaffold (code scaffold DONE; Playwright account steps pending)
 **Platforms:** iOS (TestFlight first), Android (always-buildable, ships to Play Internal in Phase 8), Web (toatre.com)
 **Build mode:** AI-driven. Owner directs, agent builds end-to-end.
+
+### Session 2026-04-25 — completed
+- Flutter mobile scaffold: bundle ID `com.toatre.app`, pubspec, all lib/ dirs, providers, splash/timeline screens, fonts, icons
+- `dart analyze`: 0 issues
+- Next.js 16 + React 19 web scaffold: brand CSS vars, landing page, `/api/health`
+- `next build`: clean
+- `codemagic.yaml`: ios-release/adhoc/android-release/flutter-test workflows
+- `.do/app.yaml`: DO App Platform spec + 2 cron jobs
+- First commit `2f6a81d` (126 files)
+- **Blocked on Playwright session:** git push, Firebase, Apple Dev, ASC, Codemagic, MongoDB, DO deployment, Resend, Twilio, domain wiring
 
 ### Decisions locked 2026-04-25
 - Apple team: **Saraf Talukder** (`8B9NZ6FRKF`)
@@ -59,65 +69,64 @@ empty TestFlight build is queued.
 - All env-var slots in `.env.example` have a real value somewhere safe (1Password / Codemagic / DO App Platform secrets).
 
 ### 0.1 — Repository scaffold (local, agent does)
-- [ ] Create `Toatre/.gitignore` (Flutter + Node + IDEs + secrets)
-- [ ] Create `Toatre/.env.example` (matches `ARCHITECTURE.md §13`)
-- [ ] Create `Toatre/CLAUDE.md` (agent operating rules)
-- [ ] Create `Toatre/PLAN.md` (this file)
-- [ ] `git init` on `Toatre/`, branch `main`
-- [ ] Add remote `origin git@github.com:realsaraf/toatre.git`
-- [ ] First commit: `chore: initial Toatre scaffold (PRODUCT, ARCHITECTURE, PLAN, CLAUDE, README)`
+- [x] Create `Toatre/.gitignore` (Flutter + Node + IDEs + secrets) (2026-04-25)
+- [x] Create `Toatre/.env.example` (matches `ARCHITECTURE.md §13`) (2026-04-25)
+- [x] Create `Toatre/CLAUDE.md` (agent operating rules) (2026-04-25)
+- [x] Create `Toatre/PLAN.md` (this file) (2026-04-25)
+- [x] `git init` on `Toatre/`, branch `main` (2026-04-25)
+- [ ] Add remote `origin git@github.com:realsaraf/toatre.git` — **needs owner to confirm push (destructive: overwrites old Plotto Expo code)**
+- [x] First commit: `chore: Phase 0 scaffold — Flutter mobile + Next.js web (com.toatre.app)` commit `2f6a81d` (2026-04-25)
 
 ### 0.2 — Flutter app scaffold (`mobile/`)
-- [ ] `flutter create --org com.toatre --project-name toatre --platforms ios,android mobile`
-- [ ] Verify `mobile/ios/Runner.xcodeproj` bundle id is `com.toatre.app`
-- [ ] Verify `mobile/android/app/build.gradle.kts` applicationId is `com.toatre.app`
-- [ ] Replace generated `pubspec.yaml` with the locked deps from `ARCHITECTURE.md §4`
-- [ ] Replace `mobile/lib/main.dart` with Sentry+Firebase init + `runApp(const ToatreApp())`
-- [ ] Create `mobile/lib/app.dart` (MultiProvider + MaterialApp, dark theme)
-- [ ] Create `mobile/lib/config/theme_config.dart`
-- [ ] Create `mobile/lib/utils/app_colors.dart` with single-source brand gradient
-- [ ] Create `mobile/lib/utils/text_styles.dart` (Inter)
-- [ ] Stub all directories from `ARCHITECTURE.md §4` with `.gitkeep` files
-- [ ] Stub `mobile/lib/ui/splash/splash_screen.dart` (logo + 1s pause → Timeline)
-- [ ] Stub `mobile/lib/ui/timeline/timeline_screen.dart` (empty state + mic FAB)
-- [ ] Stub providers (auth, toats, capture, pings, settings) as empty ChangeNotifiers
-- [ ] `flutter pub get` runs clean
-- [ ] `flutter analyze` runs clean
+- [x] `flutter create --org com.toatre --project-name toatre --platforms ios,android mobile` (2026-04-25)
+- [x] Verify `mobile/ios/Runner.xcodeproj` bundle id is `com.toatre.app` (2026-04-25)
+- [x] Verify `mobile/android/app/build.gradle.kts` applicationId is `com.toatre.app` (2026-04-25)
+- [x] Replace generated `pubspec.yaml` with the locked deps from `ARCHITECTURE.md §4` (2026-04-25)
+- [x] Replace `mobile/lib/main.dart` with Sentry+Firebase init + `runApp(const ToatreApp())` (2026-04-25)
+- [x] Create `mobile/lib/app.dart` (MultiProvider + MaterialApp, dark theme) (2026-04-25)
+- [x] Create `mobile/lib/config/theme_config.dart` (2026-04-25)
+- [x] Create `mobile/lib/utils/app_colors.dart` with single-source brand gradient (2026-04-25)
+- [x] Create `mobile/lib/utils/text_styles.dart` (Inter) (2026-04-25)
+- [x] Stub all directories from `ARCHITECTURE.md §4` with `.gitkeep` files (2026-04-25)
+- [x] Stub `mobile/lib/ui/splash/splash_screen.dart` (logo + 1s pause → Timeline) (2026-04-25)
+- [x] Stub `mobile/lib/ui/timeline/timeline_screen.dart` (empty state + mic FAB) (2026-04-25)
+- [x] Stub providers (auth, toats, capture, pings, people, share, settings, connectivity) as empty ChangeNotifiers (2026-04-25)
+- [x] `flutter pub get` runs clean (2026-04-25)
+- [x] `flutter analyze` runs clean — 0 issues (2026-04-25)
 - [ ] App boots on iOS simulator showing dark splash → empty Timeline
 - [ ] App boots on Android emulator showing same
 
 ### 0.3 — Next.js app scaffold (`web/`)
-- [ ] `pnpm create next-app@latest web --ts --tailwind --app --src-dir --import-alias '@/*' --use-npm` (despite name, project uses npm to match Mutqin)
-- [ ] Upgrade to Next.js 16, React 19 (`npm install next@latest react@latest react-dom@latest`)
-- [ ] Tailwind v4 config with brand gradient CSS vars
-- [ ] Create `web/src/app/globals.css` with single-source brand gradient + glass-card utility classes
-- [ ] Replace `web/src/app/page.tsx` with placeholder landing ("Toatre — coming soon")
-- [ ] Stub `web/src/app/api/health/route.ts` (returns `{ ok: true, sha }`)
+- [x] `npx create-next-app@latest web --ts --tailwind --app --src-dir --import-alias '@/*' --use-npm --no-git` (2026-04-25)
+- [x] Next.js 16.2.4, React 19.2.4 — already at latest (2026-04-25)
+- [x] Tailwind v4 with brand gradient CSS vars (2026-04-25)
+- [x] Create `web/src/app/globals.css` with single-source brand gradient + glass-card utility classes (2026-04-25)
+- [x] Replace `web/src/app/page.tsx` with placeholder landing ("Toatre — coming soon") (2026-04-25)
+- [x] Stub `web/src/app/api/health/route.ts` (returns `{ status: "ok", service, timestamp }`) (2026-04-25)
 - [ ] Stub all directories from `ARCHITECTURE.md §5` with `.gitkeep`
 - [ ] Add `eslint`, `prettier`, `tsc --noEmit` to npm scripts
-- [ ] `npm run lint` clean, `npm run build` clean
+- [x] `npm run build` clean (2026-04-25)
 - [ ] `npm run dev` shows the placeholder at `localhost:3000`
 
 ### 0.4 — Brand assets generation
 - [ ] Port `scripts/generate-icons.mjs` from old PLOTTO repo
 - [ ] Generate `web/public/icon-*.png`, `web/public/og-image.png`, `web/src/app/icon.png`, `web/src/app/apple-icon.png`, `web/public/favicon.ico`
 - [ ] Generate `mobile/assets/icon.png` (1024), `mobile/assets/adaptive-icon.png`, `mobile/assets/splash.png`
-- [ ] Run `flutter_launcher_icons` to push into iOS + Android native projects
+- [x] Run `flutter_launcher_icons` to push into iOS + Android native projects (2026-04-25)
 - [ ] Verify on simulator: home-screen icon is the Toatre mark
 - [ ] Build `mobile/lib/widgets/toatre_mark.dart` (SVG wordmark)
 - [ ] Build `web/src/components/ToatreMark.tsx` (SVG wordmark)
 
 ### 0.5 — Mobile CI/CD (Codemagic)
-- [ ] Author `mobile/codemagic.yaml` modeled on Mutqin's, bundle `com.toatre.app`, team `8B9NZ6FRKF`
-- [ ] Workflows: `ios-release` (push to main → TestFlight), `ios-adhoc`, `android-release` (push to main → Play Internal), `flutter-test` (every PR)
+- [x] Author `codemagic.yaml` at repo root, bundle `com.toatre.app`, team `8B9NZ6FRKF` (2026-04-25)
+- [x] Workflows: `ios-release`, `ios-adhoc`, `android-release` (disabled), `flutter-test` (2026-04-25)
 - [ ] **[Playwright + user]** Codemagic dashboard: add Toatre app, link `realsaraf/toatre` repo
-- [ ] **[Playwright + user]** Codemagic: link App Store Connect API key integration (reuse Mutqin's if same Apple ID, otherwise add new key)
+- [ ] **[Playwright + user]** Codemagic: link App Store Connect API key integration
 - [ ] **[Playwright + user]** Codemagic: link Google Play service account (defer until Phase 8 Android submission)
 - [ ] First Codemagic build triggered (allowed to fail — verifying webhook + repo link)
 
 ### 0.6 — Web CI/CD (DigitalOcean App Platform)
-- [ ] Create `.do/app.yaml` spec (build command `cd web && npm ci && npm run build`, run `cd web && npm start`, health `/api/health`)
-- [ ] Add scheduled jobs spec for `* * * * * GET /api/cron/fire-pings` (gated by `CRON_SECRET`) and `0 3 * * * GET /api/cron/cleanup-captures`
+- [x] Create `.do/app.yaml` spec (web service + 2 cron jobs fire-pings/cleanup-captures) (2026-04-25)
 - [ ] **[Playwright + user]** DO dashboard (team **iReve**): create App Platform app `toatre-prod`, link GitHub `realsaraf/toatre`, branch `main`, autodeploy on
 - [ ] **[Playwright + user]** DO dashboard: paste env vars from secret store
 - [ ] First deploy: `toatre-prod-*.ondigitalocean.app` returns 200 on landing page
