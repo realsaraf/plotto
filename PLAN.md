@@ -14,9 +14,20 @@
 ## 📊 Status Summary
 
 **Last updated:** 2026-04-25
-**Current phase:** Phase 0 — Accounts + scaffold (code scaffold DONE; Playwright account steps pending)
+**Current phase:** Phase 0 — Accounts + scaffold (iOS CI ✅ deployed to TestFlight; remaining: Playwright account steps)
 **Platforms:** iOS (TestFlight first), Android (always-buildable, ships to Play Internal in Phase 8), Web (toatre.com)
 **Build mode:** AI-driven. Owner directs, agent builds end-to-end.
+
+### Session 2026-04-25 (CI unblocking) — completed
+- Created iOS Distribution cert `SJ5FF9432Y` (iPhone Distribution: Saraf Talukder, expires 2027-04-25)
+- Generated private key + P12 (`ios_distribution.p12`, password: `toatre2026`)
+- Created App Store provisioning profile `2J2XK85JLQ` ("toatre app AppStore", com.toatre.app)
+- Uploaded P12 + profile to Codemagic Code signing identities (`toatre-ios-distribution`, `toatre-appstore-profile`)
+- Updated `codemagic.yaml`: replaced `distribution_type/bundle_identifier` with explicit `provisioning_profiles/certificates` references → bypasses Apple portal pre-flight check
+- Created `mobile/ios/Podfile` (was missing) with `platform :ios, '16.0'` for audioplayers 6.x
+- Updated `Runner.xcodeproj` `IPHONEOS_DEPLOYMENT_TARGET` 12.0 → 16.0
+- **Build `69ececd78a01dd78a19bb6fb` SUCCEEDED 2026-04-25T16:41:49** — all 11 steps green
+- **First Toatre iOS IPA deployed to TestFlight** ✅
 
 ### Session 2026-04-25 — completed
 - Flutter mobile scaffold: bundle ID `com.toatre.app`, pubspec, all lib/ dirs, providers, splash/timeline screens, fonts, icons
@@ -123,7 +134,7 @@ empty TestFlight build is queued.
 - [ ] **[Playwright + user]** Codemagic dashboard: add Toatre app, link `realsaraf/toatre` repo
 - [ ] **[Playwright + user]** Codemagic: link App Store Connect API key integration
 - [ ] **[Playwright + user]** Codemagic: link Google Play service account (defer until Phase 8 Android submission)
-- [ ] First Codemagic build triggered (allowed to fail — verifying webhook + repo link)
+- [x] First Codemagic build triggered — build `69ececd78a01dd78a19bb6fb` **SUCCEEDED**, IPA deployed to TestFlight (2026-04-25)
 
 ### 0.6 — Web CI/CD (DigitalOcean App Platform)
 - [x] Create `.do/app.yaml` spec (web service + 2 cron jobs fire-pings/cleanup-captures) (2026-04-25)
