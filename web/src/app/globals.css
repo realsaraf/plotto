@@ -3,22 +3,34 @@
 /* ─── Single source of truth: Toatre brand colours ───────────────────────── */
 /* NEVER hardcode these hex values outside this file.                          */
 :root {
-  /* Brand gradient */
-  --color-gradient-start: #4F46E5; /* Indigo */
-  --color-gradient-end:   #F59E0B; /* Amber  */
+  /* Brand gradient (matches design screenshots) */
+  --color-gradient-start: #6366F1; /* indigo-500 */
+  --color-gradient-end:   #F59E0B; /* amber-400  */
 
-  /* Backgrounds (dark-only) */
-  --color-bg:          #0A0A0F;
-  --color-bg-elevated: #13131A;
-  --color-card:        rgba(19, 19, 26, 0.7);
+  /* Mic / capture gradient */
+  --color-mic-start: #8B5CF6;  /* violet-500 */
+  --color-mic-end:   #EC4899;  /* pink-500   */
+
+  /* Backgrounds — light lavender theme (matches screenshots) */
+  --color-bg:          #F5F4FF;
+  --color-bg-elevated: #EEEDF9;
+  --color-bg-app:      #FAFAFF;
+  --color-card:        #FFFFFF;
+  --color-surface:     #EDE9FE;
 
   /* Text */
-  --color-text:           #E8EDF5;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted:     #6B7A94;
+  --color-text:           #1A1128;
+  --color-text-secondary: #6B7280;
+  --color-text-muted:     #9CA3AF;
 
   /* Border */
-  --color-border: rgba(148, 155, 168, 0.10);
+  --color-border:        rgba(99, 102, 241, 0.12);
+  --color-border-strong: rgba(99, 102, 241, 0.25);
+
+  /* Brand primary */
+  --color-primary:       #4F46E5;
+  --color-primary-hover: #4338CA;
+  --color-primary-light: #EDE9FE;
 
   /* Status */
   --color-success: #22C55E;
@@ -28,9 +40,9 @@
   /* Tier */
   --color-tier-urgent:    #EF4444;
   --color-tier-important: #F59E0B;
-  --color-tier-regular:   #6B7A94;
+  --color-tier-regular:   #6B7280;
 
-  /* Backward compat shims for Next.js template */
+  /* Backward compat */
   --background: var(--color-bg);
   --foreground: var(--color-text);
 }
@@ -43,6 +55,8 @@
 /* ─── Base ────────────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
@@ -64,6 +78,44 @@ body {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 16px;
-  backdrop-filter: blur(12px);
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.06);
 }
+
+/* ─── Animations ──────────────────────────────────────────────────────────── */
+@keyframes pulse-ring {
+  0% {
+    box-shadow:
+      0 0 0 0   rgba(99, 102, 241, 0.35),
+      0 0 0 12px rgba(99, 102, 241, 0.15);
+  }
+  70% {
+    box-shadow:
+      0 0 0 24px rgba(99, 102, 241, 0),
+      0 0 0 50px rgba(99, 102, 241, 0);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(99, 102, 241, 0),
+      0 0 0 0 rgba(99, 102, 241, 0);
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes waveform {
+  0%, 100% { transform: scaleY(0.25); }
+  50%       { transform: scaleY(1); }
+}
+
+.animate-fade-up   { animation: fade-up 0.3s ease-out forwards; }
+.animate-spin      { animation: spin 0.7s linear infinite; }
+.mic-pulse         { animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
