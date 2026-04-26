@@ -78,8 +78,6 @@ export default function CapturePage() {
   const chunksRef = useRef<Blob[]>([]);
   const hasAutoStartedRef = useRef(false);
 
-  useEffect(() => { return () => { stopAll(); }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const resetWaveform = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
     animFrameRef.current = 0;
@@ -125,6 +123,12 @@ export default function CapturePage() {
     closeAudioContext();
     stopStream();
   }, [clearTimer, closeAudioContext, resetWaveform, stopStream]);
+
+  useEffect(() => {
+    return () => {
+      stopAll();
+    };
+  }, [stopAll]);
 
   const startWaveform = useCallback((stream: MediaStream) => {
     const ctx = new AudioContext();

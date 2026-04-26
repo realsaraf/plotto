@@ -2,88 +2,374 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TopNav } from "@/components/TopNav";
 import { useAuth } from "@/lib/auth/auth-context";
+import {
+  AppBrand,
+  BottomTabBar,
+  BulbGlyph,
+  CalendarIcon,
+  CartGlyph,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CircleIconButton,
+  ClockIcon,
+  DirectionsIcon,
+  EnvelopeGlyph,
+  FilterIcon,
+  FloatingMicButton,
+  InboxIcon,
+  LocationIcon,
+  MessageGlyph,
+  PeopleIcon,
+  PhoneGlyph,
+  SearchIcon,
+  SettingsIcon,
+  SparkleIcon,
+  TicketGlyph,
+  TimelineIcon,
+  ToothGlyph,
+  UserAvatar,
+  VideoGlyph,
+} from "@/components/mobile-ui";
 
 type ToatKind = "task" | "event" | "meeting" | "errand" | "deadline" | "idea";
 type ToatTier = "urgent" | "important" | "regular";
 
-interface ApiToat {
+interface TimelineToat {
   id: string;
   kind: ToatKind;
   tier: ToatTier;
   title: string;
   datetime: string | null;
-  location?: string | null;
-  link?: string | null;
+  endDatetime: string | null;
+  location: string | null;
+  link: string | null;
+  people: string[];
+  notes: string | null;
+  status: string;
+  captureId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface DemoToat {
-  id: string;
-  kind: ToatKind;
-  tier: ToatTier;
+interface DayGroup {
+  key: string;
   title: string;
-  time: string;
-  location?: string;
-  link?: string;
-  day: "today" | "tomorrow" | "later";
-  isUpNext?: boolean;
+  subtitle: string;
+  toats: TimelineToat[];
 }
 
-const NOW = new Date();
+interface TimeSection {
+  label: string;
+  toats: TimelineToat[];
+}
 
-function classifyToat(t: ApiToat): DemoToat {
-  const dt = t.datetime ? new Date(t.datetime) : null;
-  const timeStr = dt ? dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-  let day: DemoToat["day"] = "later";
-  if (dt) {
-    const tDay = new Date(dt); tDay.setHours(0,0,0,0);
-    const today = new Date(NOW); today.setHours(0,0,0,0);
-    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-    if (tDay.getTime() === today.getTime()) day = "today";
-    else if (tDay.getTime() === tomorrow.getTime()) day = "tomorrow";
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatTime(date: Date) {
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function formatRailTime(date: Date) {
+  const text = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+  const [time, period] = text.split(" ");
+  return { time, period: period ?? "" };
+}
+
+function formatSecondaryDate(date: Date) {
+  return date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
+
+function relativeDayLabel(date: Date, now: Date) {
+  const today = startOfDay(now).getTime();
+  const target = startOfDay(date).getTime();
+  const diffDays = Math.round((target - today) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays === -1) return "Yesterday";
+  return date.toLocaleDateString("en-US", { weekday: "long" });
+}
+
+function buildDayGroups(toats: TimelineToat[], now: Date): DayGroup[] {
+  const buckets = new Map<string, TimelineToat[]>();
+
+  for (const toat of toats) {
+    const key = toat.datetime ? startOfDay(new Date(toat.datetime)).toISOString() : "undated";
+    const existing = buckets.get(key) ?? [];
+    existing.push(toat);
+    buckets.set(key, existing);
   }
+
+  return Array.from(buckets.entries())
+    .sort(([leftKey], [rightKey]) => {
+      if (leftKey === "undated") return 1;
+      if (rightKey === "undated") return -1;
+      return new Date(leftKey).getTime() - new Date(rightKey).getTime();
+    })
+    .map(([key, groupToats]) => {
+      if (key === "undated") {
+        return { key, title: "Someday", subtitle: "Whenever you get to it", toats: sortToats(groupToats) };
+      }
+
+      const groupDate = new Date(key);
+      return {
+        key,
+        title: relativeDayLabel(groupDate, now),
+        subtitle: formatSecondaryDate(groupDate),
+        toats: sortToats(groupToats),
+      };
+    });
+}
+
+function sortToats(toats: TimelineToat[]) {
+  return [...toats].sort((left, right) => {
+    if (!left.datetime && !right.datetime) return left.createdAt.localeCompare(right.createdAt);
+    if (!left.datetime) return 1;
+    if (!right.datetime) return -1;
+    return new Date(left.datetime).getTime() - new Date(right.datetime).getTime();
+  });
+}
+
+function buildSections(toats: TimelineToat[]): TimeSection[] {
+  const sections = new Map<string, TimelineToat[]>();
+
+  for (const toat of toats) {
+    if (!toat.datetime) {
+      const undated = sections.get("Any time") ?? [];
+      undated.push(toat);
+      sections.set("Any time", undated);
+      continue;
+    }
+
+    const hour = new Date(toat.datetime).getHours();
+    const label = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening";
+    const existing = sections.get(label) ?? [];
+    existing.push(toat);
+    sections.set(label, existing);
+  }
+
+  return Array.from(sections.entries()).map(([label, sectionToats]) => ({ label, toats: sectionToats }));
+}
+
+function formatMinutesLabel(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+function extractPhone(toat: TimelineToat) {
+  const match = `${toat.title} ${toat.notes ?? ""}`.match(/(\+?\d[\d\s().-]{7,}\d)/);
+  return match ? match[1] : null;
+}
+
+function mapHref(location: string | null) {
+  if (!location) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
+
+function normalizeKeywords(text: string) {
+  return text.toLowerCase();
+}
+
+function getToatVisual(toat: TimelineToat) {
+  const text = normalizeKeywords(`${toat.title} ${toat.notes ?? ""}`);
+
+  if (/dentist|doctor|clinic|appointment|check-up/.test(text)) {
+    return {
+      label: "Appointment",
+      cardGradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
+      iconTint: "#8B5CF6",
+      softTint: "rgba(139,92,246,0.12)",
+      actionText: "Directions",
+      actionBackground: "rgba(123,92,246,0.12)",
+      actionColor: "#6D28D9",
+      Icon: ToothGlyph,
+    };
+  }
+
+  if (toat.kind === "meeting" || /meet|standup|sync|zoom|google meet|call with/.test(text)) {
+    return {
+      label: "Meeting",
+      cardGradient: "linear-gradient(135deg, #3B82F6, #2563EB)",
+      iconTint: "#3B82F6",
+      softTint: "rgba(59,130,246,0.12)",
+      actionText: "Join",
+      actionBackground: "rgba(59,130,246,0.12)",
+      actionColor: "#2563EB",
+      Icon: VideoGlyph,
+    };
+  }
+
+  if (/call /.test(text) || /phone/.test(text)) {
+    return {
+      label: "Call",
+      cardGradient: "linear-gradient(135deg, #F43F5E, #EC4899)",
+      iconTint: "#EC4899",
+      softTint: "rgba(236,72,153,0.12)",
+      actionText: "Call",
+      actionBackground: "rgba(236,72,153,0.12)",
+      actionColor: "#DB2777",
+      Icon: PhoneGlyph,
+    };
+  }
+
+  if (/email|send|deck|message/.test(text)) {
+    return {
+      label: "Task",
+      cardGradient: "linear-gradient(135deg, #F97316, #FB923C)",
+      iconTint: "#F97316",
+      softTint: "rgba(249,115,22,0.12)",
+      actionText: "Message",
+      actionBackground: "rgba(249,115,22,0.12)",
+      actionColor: "#EA580C",
+      Icon: EnvelopeGlyph,
+    };
+  }
+
+  if (/grocer|shopping|buy /.test(text)) {
+    return {
+      label: "Errand",
+      cardGradient: "linear-gradient(135deg, #8B5CF6, #7C3AED)",
+      iconTint: "#8B5CF6",
+      softTint: "rgba(139,92,246,0.12)",
+      actionText: "Directions",
+      actionBackground: "rgba(139,92,246,0.12)",
+      actionColor: "#6D28D9",
+      Icon: CartGlyph,
+    };
+  }
+
+  if (toat.kind === "event") {
+    return {
+      label: "Event",
+      cardGradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
+      iconTint: "#7C3AED",
+      softTint: "rgba(124,58,237,0.12)",
+      actionText: "Tickets",
+      actionBackground: "rgba(124,58,237,0.12)",
+      actionColor: "#6D28D9",
+      Icon: TicketGlyph,
+    };
+  }
+
+  if (toat.kind === "idea" || /read|idea|brainstorm|note/.test(text)) {
+    return {
+      label: "Idea",
+      cardGradient: "linear-gradient(135deg, #F59E0B, #FBBF24)",
+      iconTint: "#F59E0B",
+      softTint: "rgba(245,158,11,0.12)",
+      actionText: "Open",
+      actionBackground: "rgba(245,158,11,0.12)",
+      actionColor: "#D97706",
+      Icon: BulbGlyph,
+    };
+  }
+
   return {
-    id: t.id,
-    kind: t.kind,
-    tier: t.tier,
-    title: t.title,
-    time: timeStr,
-    location: t.location ?? undefined,
-    link: t.link ?? undefined,
-    day,
+    label: toat.kind === "deadline" ? "Deadline" : "Task",
+    cardGradient: "linear-gradient(135deg, #8B5CF6, #EC4899)",
+    iconTint: "#8B5CF6",
+    softTint: "rgba(139,92,246,0.12)",
+    actionText: "Open",
+    actionBackground: "rgba(139,92,246,0.12)",
+    actionColor: "#6D28D9",
+    Icon: MessageGlyph,
   };
 }
 
-/* ─── Kind metadata ──────────────────────────────────────────────────────── */
+function getCountdownLabel(toat: TimelineToat, now: Date) {
+  if (!toat.datetime) return "Any time";
 
-const KIND_META: Record<ToatKind, { icon: string; color: string; bg: string }> = {
-  task:     { icon: "✓",  color: "#6366F1", bg: "#EDE9FE" },
-  event:    { icon: "🎫", color: "#7C3AED", bg: "#F3E8FF" },
-  meeting:  { icon: "💬", color: "#2563EB", bg: "#DBEAFE" },
-  errand:   { icon: "📍", color: "#D97706", bg: "#FEF3C7" },
-  deadline: { icon: "⚡", color: "#DC2626", bg: "#FEE2E2" },
-  idea:     { icon: "💡", color: "#059669", bg: "#D1FAE5" },
-};
+  const start = new Date(toat.datetime);
+  const end = toat.endDatetime ? new Date(toat.endDatetime) : null;
+  const diffMinutes = Math.round((start.getTime() - now.getTime()) / 60000);
 
-const TIER_COLOR: Record<ToatTier, string> = {
-  urgent:    "#EF4444",
-  important: "#F59E0B",
-  regular:   "#D1D5DB",
-};
+  if (end && now >= start && now <= end) return "Happening now";
+  if (diffMinutes > 0 && diffMinutes <= 15) return `Leave in ${formatMinutesLabel(diffMinutes)}`;
+  if (diffMinutes > 15) return `Starting in ${formatMinutesLabel(diffMinutes)}`;
+  if (diffMinutes <= 0 && (!end || now > end)) return "Past due";
+  return formatTime(start);
+}
 
-/* ─── Page ───────────────────────────────────────────────────────────────── */
+function getPrimaryAction(toat: TimelineToat) {
+  const visual = getToatVisual(toat);
+  const phone = extractPhone(toat);
+  const directions = mapHref(toat.location);
+
+  if ((toat.kind === "meeting" || visual.actionText === "Join") && toat.link) {
+    return { label: "Join", href: toat.link, external: true };
+  }
+
+  if (visual.actionText === "Call" && phone) {
+    return { label: "Call", href: `tel:${phone.replace(/\s+/g, "")}`, external: true };
+  }
+
+  if (visual.actionText === "Message" && toat.link) {
+    return { label: "Message", href: toat.link, external: true };
+  }
+
+  if (directions && (visual.actionText === "Directions" || toat.location)) {
+    return { label: "Directions", href: directions, external: true };
+  }
+
+  if (toat.kind === "event" && toat.link) {
+    return { label: "Tickets", href: toat.link, external: true };
+  }
+
+  return { label: visual.actionText, href: `/toats/${toat.id}`, external: false };
+}
+
+function getUpNext(toats: TimelineToat[], now: Date) {
+  return [...toats]
+    .filter((toat) => toat.datetime && toat.status === "active")
+    .sort((left, right) => new Date(left.datetime!).getTime() - new Date(right.datetime!).getTime())
+    .find((toat) => {
+      const start = new Date(toat.datetime!);
+      const end = toat.endDatetime ? new Date(toat.endDatetime) : null;
+      if (end && now > end) return false;
+      return start >= new Date(now.getTime() - 15 * 60000);
+    });
+}
+
+function EmptyTimeline({ onCapture }: { onCapture: () => void }) {
+  return (
+    <section style={styles.emptyCard}>
+      <div style={styles.emptySun} />
+      <div style={styles.emptyGlow} />
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={styles.emptyBadgeWrap}>
+          <span style={styles.emptyBadge}><SparkleIcon size={18} /></span>
+        </div>
+        <h2 style={styles.emptyTitle}>You&apos;re all clear.</h2>
+        <p style={styles.emptyBody}>Tap the mic and say what needs to happen next. Toatre will turn it into toats and drop them into your timeline.</p>
+        <button type="button" onClick={onCapture} style={styles.emptyCaptureButton}>Start capturing</button>
+      </div>
+      <div style={styles.landscape}>
+        <div style={styles.sunDisc} />
+        <div style={styles.hillOne} />
+        <div style={styles.hillTwo} />
+      </div>
+    </section>
+  );
+}
 
 export default function TimelinePage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const [hasLoadedData, setHasLoadedData] = useState(false);
+  const [toats, setToats] = useState<TimelineToat[]>([]);
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [showOnlyTimed, setShowOnlyTimed] = useState(false);
+
+  const now = new Date();
   const openCapture = () => router.push("/capture?autostart=1");
-  const { user } = useAuth();
-  const [toats, setToats] = useState<DemoToat[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
-      setLoading(false);
       return;
     }
 
@@ -92,468 +378,834 @@ export default function TimelinePage() {
     (async () => {
       try {
         const token = await user.getIdToken();
-        const res = await fetch("/api/toats?range=all", {
+        const response = await fetch("/api/toats?range=all", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) throw new Error(`${res.status}`);
 
-        const data = (await res.json()) as { toats?: ApiToat[] };
-
-        if (!cancelled) {
-          setToats((data.toats ?? []).map(classifyToat));
+        if (!response.ok) {
+          throw new Error(`Failed to load timeline (${response.status})`);
         }
-      } catch (e) {
-        console.error("[timeline] fetch failed", e);
+
+        const data = (await response.json()) as { toats?: TimelineToat[] };
+        if (!cancelled) {
+          setToats(sortToats(data.toats ?? []));
+        }
+      } catch (error) {
+        console.error("[timeline]", error);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setHasLoadedData(true);
+        }
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  const now = new Date();
-  const upNext = toats
-    .filter((t) => t.day === "today" && t.time)
-    .sort((a, b) => a.time.localeCompare(b.time))
-    .find((t) => {
-      // first toat in the future today
-      const [h, m] = t.time.split(/[: ]/);
-      const isPm = t.time.toLowerCase().includes("pm");
-      const hour = parseInt(h ?? "0") + (isPm && parseInt(h ?? "0") !== 12 ? 12 : 0);
-      const toatMin = new Date(); toatMin.setHours(hour, parseInt(m ?? "0"), 0, 0);
-      return toatMin >= now;
-    });
-  const todayToats = toats.filter((t) => t.day === "today" && t !== upNext);
-  const tomorrowToats = toats.filter((t) => t.day === "tomorrow");
-  const laterToats = toats.filter((t) => t.day === "later");
+  const groups = buildDayGroups(toats, now);
+  const resolvedSelectedDayKey = selectedDayKey && groups.some((group) => group.key === selectedDayKey)
+    ? selectedDayKey
+    : (groups.find((group) => group.title === "Today") ?? groups[0])?.key ?? null;
+  const activeGroup = groups.find((group) => group.key === resolvedSelectedDayKey) ?? groups[0] ?? null;
+  const visibleToats = (activeGroup?.toats ?? []).filter((toat) => (showOnlyTimed ? Boolean(toat.datetime) : true));
+  const sections = buildSections(visibleToats);
+  const upNext = getUpNext(toats, new Date());
+  const lastToat = visibleToats[visibleToats.length - 1] ?? null;
+  const loading = authLoading || (Boolean(user) && !hasLoadedData);
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--color-bg)" }}>
-      <TopNav />
+    <div style={styles.page}>
+      <div style={styles.backgroundHaloOne} />
+      <div style={styles.backgroundHaloTwo} />
+      <div style={styles.backgroundHaloThree} />
 
       <main style={styles.main}>
-        {/* ── Header ── */}
-        <div style={styles.pageHeader}>
-          <div>
-            <h1 style={styles.pageTitle}>Your Timeline</h1>
-            <p style={styles.pageDate}>
-              {NOW.toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              })}
-            </p>
-          </div>
-          <button
-            onClick={openCapture}
-            style={styles.captureHeaderBtn}
-            aria-label="New capture"
-          >
-            <MicIcon size={16} color="#fff" /> Capture
-          </button>
-        </div>
+        <section style={styles.topRow}>
+          <AppBrand />
+          <UserAvatar user={user} />
+        </section>
 
-        {/* ── Up Next card ── */}
-        {upNext && (
-          <div style={styles.upNextCard} className="animate-fade-up">
-            <div style={styles.upNextLabel}>
-              <span style={{ fontSize: 14 }}>⚡</span> Up Next
-            </div>
-            <div style={styles.upNextBody}>
-              <div style={styles.upNextKindBadge}>
-                <span style={{ fontSize: 18 }}>
-                  {KIND_META[upNext.kind].icon}
-                </span>
+        <section style={styles.headingRow}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <button type="button" onClick={() => setPickerOpen((value) => !value)} style={styles.dayButton}>
+              <span style={styles.dayButtonLabel}>{activeGroup?.title ?? "Timeline"}</span>
+              <ChevronDownIcon size={22} />
+            </button>
+            <p style={styles.dayButtonSubtitle}>{activeGroup?.subtitle ?? "Your next toats"}</p>
+
+            {pickerOpen ? (
+              <div style={styles.dayPicker}>
+                {groups.map((group) => (
+                  <button
+                    key={group.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDayKey(group.key);
+                      setPickerOpen(false);
+                    }}
+                    style={{
+                      ...styles.dayPickerItem,
+                      background: group.key === activeGroup?.key ? "rgba(91,61,245,0.10)" : "transparent",
+                    }}
+                  >
+                    <span>
+                      <span style={styles.dayPickerTitle}>{group.title}</span>
+                      <span style={styles.dayPickerSubtitle}>{group.subtitle}</span>
+                    </span>
+                    <span style={styles.dayPickerCount}>{group.toats.length}</span>
+                  </button>
+                ))}
               </div>
-              <div style={{ flex: 1 }}>
-                <p style={styles.upNextTitle}>{upNext.title}</p>
-                <div style={styles.upNextMeta}>
-                  <span>🕐 {upNext.time}</span>
-                  {upNext.location && <span>· {upNext.location}</span>}
+            ) : null}
+          </div>
+
+          <div style={styles.headerActions}>
+            <CircleIconButton label="Choose day" onClick={() => setPickerOpen((value) => !value)}>
+              <CalendarIcon size={26} />
+            </CircleIconButton>
+            <CircleIconButton
+              label="Filter timed toats"
+              active={showOnlyTimed}
+              onClick={() => setShowOnlyTimed((value) => !value)}
+            >
+              <FilterIcon size={26} />
+            </CircleIconButton>
+          </div>
+        </section>
+
+        {loading ? (
+          <section style={styles.loadingCard}>
+            <div style={styles.loadingSpinner} className="animate-spin" />
+            <p style={styles.loadingText}>Loading your timeline…</p>
+          </section>
+        ) : null}
+
+        {!loading && upNext ? <UpNextCard toat={upNext} /> : null}
+
+        {!loading && visibleToats.length > 0 ? (
+          <section>
+            {sections.map((section) => (
+              <div key={section.label} style={styles.sectionBlock}>
+                <h2 style={styles.sectionTitle}>{section.label}</h2>
+                <div style={styles.sectionRows}>
+                  {section.toats.map((toat) => (
+                    <TimelineRow key={toat.id} toat={toat} onOpen={() => router.push(`/toats/${toat.id}`)} />
+                  ))}
                 </div>
               </div>
-              {upNext.link && (
-                <a
-                  href={upNext.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={styles.upNextAction}
-                >
-                  Join →
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Today ── */}
-        {todayToats.length > 0 && (
-          <Section label="Today">
-            {todayToats.map((t) => (
-              <ToatCard key={t.id} toat={t} />
             ))}
-          </Section>
-        )}
 
-        {/* ── Tomorrow ── */}
-        {tomorrowToats.length > 0 && (
-          <Section label="Tomorrow">
-            {tomorrowToats.map((t) => (
-              <ToatCard key={t.id} toat={t} />
-            ))}
-          </Section>
-        )}
+            <section style={styles.clearCard}>
+              <div style={styles.clearTextWrap}>
+                <span style={styles.clearSparkle}><SparkleIcon size={18} /></span>
+                <div>
+                  <p style={styles.clearHeadline}>
+                    {lastToat?.datetime ? `You’re all clear after ${formatTime(new Date(lastToat.datetime))}` : "You’re all clear."}
+                  </p>
+                  <p style={styles.clearSub}>Enjoy your {lastToat?.datetime && new Date(lastToat.datetime).getHours() < 17 ? "evening" : "day"}.</p>
+                </div>
+              </div>
+              <div style={styles.clearScene}>
+                <div style={styles.clearSceneSun} />
+                <div style={styles.clearSceneHillOne} />
+                <div style={styles.clearSceneHillTwo} />
+              </div>
+            </section>
+          </section>
+        ) : null}
 
-        {/* ── This week ── */}
-        {laterToats.length > 0 && (
-          <Section label="This week">
-            {laterToats.map((t) => (
-              <ToatCard key={t.id} toat={t} />
-            ))}
-          </Section>
-        )}
+        {!loading && !toats.length ? <EmptyTimeline onCapture={openCapture} /> : null}
 
-        {/* ── Loading state ── */}
-        {loading && (
-          <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 16, paddingTop: 60, color: "var(--color-text-muted)", fontSize: 15 }}>
-            <svg width={28} height={28} viewBox="0 0 28 28" fill="none" className="animate-spin" aria-hidden>
-              <circle cx={14} cy={14} r={11} stroke="rgba(99,102,241,0.25)" strokeWidth={3} />
-              <path d="M14 3a11 11 0 0 1 11 11" stroke="#6366F1" strokeWidth={3} strokeLinecap="round" />
-            </svg>
-            Loading your timeline…
-          </div>
-        )}
-
-        {/* ── Empty state ── */}
-        {!loading && toats.length === 0 && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>🎤</div>
-            <p style={styles.emptyTitle}>You&apos;re all clear.</p>
-            <p style={styles.emptySubtext}>
-              Tap the mic to tell Toatre what&apos;s on your mind.
-            </p>
-            <button
-              onClick={openCapture}
-              style={styles.emptyBtn}
-            >
-              <MicIcon size={16} color="#fff" /> Start capturing
-            </button>
-          </div>
-        )}
-
-        {/* Spacer so FAB doesn't overlap last item */}
-        <div style={{ height: 100 }} />
+        <div style={{ height: 220 }} />
       </main>
 
-      {/* ── Floating capture button ── */}
-      <button
-        onClick={openCapture}
-        style={styles.fab}
-        aria-label="Open mic capture"
-      >
-        <MicIcon size={24} color="#fff" />
-      </button>
-    </div>
-  );
-}
+      <FloatingMicButton onClick={openCapture} />
 
-/* ─── Section ─────────────────────────────────────────────────────────────── */
-
-function Section({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <p style={styles.sectionLabel}>{label}</p>
-      <div style={styles.sectionList}>{children}</div>
-    </div>
-  );
-}
-
-/* ─── ToatCard ────────────────────────────────────────────────────────────── */
-
-function ToatCard({ toat }: { toat: DemoToat }) {
-  const meta = KIND_META[toat.kind];
-  return (
-    <div style={styles.toatCard}>
-      {/* Tier indicator */}
-      <div
-        style={{
-          ...styles.tierDot,
-          background: TIER_COLOR[toat.tier],
-        }}
+      <BottomTabBar
+        items={[
+          { label: "Timeline", icon: <TimelineIcon />, href: "/timeline", active: true },
+          { label: "Search", icon: <SearchIcon /> },
+          { label: "People", icon: <PeopleIcon /> },
+          { label: "Inbox", icon: <InboxIcon /> },
+          { label: "Settings", icon: <SettingsIcon /> },
+        ]}
       />
-      {/* Kind icon */}
-      <div
-        style={{
-          ...styles.kindIcon,
-          background: meta.bg,
-          color: meta.color,
-        }}
-      >
-        {meta.icon}
+    </div>
+  );
+}
+
+function UpNextCard({ toat }: { toat: TimelineToat }) {
+  const router = useRouter();
+  const visual = getToatVisual(toat);
+  const Icon = visual.Icon;
+  const action = getPrimaryAction(toat);
+  const time = toat.datetime ? formatTime(new Date(toat.datetime)) : "Any time";
+
+  const openAction = () => {
+    if (action.external) {
+      window.open(action.href, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    router.push(action.href);
+  };
+
+  return (
+    <section style={styles.upNextCard} className="animate-fade-up">
+      <div style={styles.upNextMetaRow}>
+        <span style={styles.upNextBadge}><SparkleIcon size={16} /> UP NEXT</span>
+        <span style={styles.upNextTimePill}><ClockIcon size={18} /> {time}</span>
       </div>
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={styles.toatTitle}>{toat.title}</p>
-        <div style={styles.toatMeta}>
-          <span style={styles.toatTime}>{toat.time}</span>
-          {toat.location && (
-            <span style={styles.toatLocation}>· {toat.location}</span>
-          )}
+
+      <div style={styles.upNextBody}>
+        <div style={{ ...styles.iconPanel, background: visual.cardGradient }}>
+          <Icon size={34} />
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={styles.upNextTitle}>{toat.title}</h3>
+          {toat.location ? (
+            <p style={styles.upNextLocation}><LocationIcon size={18} /> {toat.location}</p>
+          ) : null}
+          <p style={{ ...styles.upNextCountdown, color: visual.actionColor }}>{getCountdownLabel(toat, new Date())}</p>
+        </div>
+
+        <button type="button" onClick={openAction} style={{ ...styles.primaryPillButton, background: visual.cardGradient }}>
+          <DirectionsIcon size={18} /> {action.label === "Open" ? "View details" : action.label}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function TimelineRow({ toat, onOpen }: { toat: TimelineToat; onOpen: () => void }) {
+  const visual = getToatVisual(toat);
+  const Icon = visual.Icon;
+  const action = getPrimaryAction(toat);
+
+  const runAction = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+
+    if (action.external) {
+      window.open(action.href, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    onOpen();
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onOpen();
+    }
+  };
+
+  const railTime = toat.datetime ? formatRailTime(new Date(toat.datetime)) : { time: "Any", period: "time" };
+
+  return (
+    <div style={styles.timelineRow}>
+      <div style={styles.timeRailColumn}>
+        <p style={styles.timeRailTime}>{railTime.time}</p>
+        <p style={styles.timeRailPeriod}>{railTime.period}</p>
+      </div>
+
+      <div style={styles.railTrackWrap}>
+        <div style={styles.railLine} />
+        <span style={{ ...styles.railDot, background: visual.iconTint }} />
+      </div>
+
+      <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={onKeyDown} style={styles.toatCard}>
+        <div style={{ ...styles.iconPanel, width: 92, height: 92, borderRadius: 28, background: visual.cardGradient, boxShadow: `0 26px 44px ${visual.softTint}` }}>
+          <Icon size={36} />
+        </div>
+
+        <div style={styles.cardBody}>
+          <div style={styles.cardHeader}>
+            <div style={{ minWidth: 0 }}>
+              <p style={styles.cardTitle}>{toat.title}</p>
+              {toat.location ? (
+                <p style={styles.cardMeta}><LocationIcon size={18} /> {toat.location}</p>
+              ) : toat.people.length ? (
+                <p style={styles.cardMeta}><PeopleIcon size={18} /> {toat.people.join(", ")}</p>
+              ) : (
+                <p style={styles.cardMeta}>{getCountdownLabel(toat, new Date())}</p>
+              )}
+            </div>
+            <span style={{ color: "#9CA3AF", flexShrink: 0 }}><ChevronRightIcon /></span>
+          </div>
+
+          <div style={styles.cardFooter}>
+            <span style={{ ...styles.kindPill, color: visual.actionColor, background: visual.softTint }}>{visual.label}</span>
+            <button type="button" onClick={runAction} style={{ ...styles.cardActionButton, color: visual.actionColor, background: visual.actionBackground }}>
+              <DirectionsIcon size={18} /> {action.label}
+            </button>
+          </div>
         </div>
       </div>
-      {/* Chevron */}
-      <svg width={16} height={16} viewBox="0 0 16 16" fill="none" aria-hidden>
-        <path
-          d="M6 4l4 4-4 4"
-          stroke="var(--color-text-muted)"
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
     </div>
   );
 }
 
-/* ─── Mic icon ────────────────────────────────────────────────────────────── */
-
-function MicIcon({ size = 20, color = "currentColor" }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x={9} y={2} width={6} height={12} rx={3} fill={color} />
-      <path
-        d="M5 10a7 7 0 0 0 14 0"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-      <line x1={12} y1={17} x2={12} y2={22} stroke={color} strokeWidth={2} strokeLinecap="round" />
-      <line x1={8} y1={22} x2={16} y2={22} stroke={color} strokeWidth={2} strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/* ─── Styles ──────────────────────────────────────────────────────────────── */
-
 const styles: Record<string, React.CSSProperties> = {
-  main: {
-    maxWidth: 680,
-    margin: "0 auto",
-    padding: "24px 20px",
+  page: {
+    minHeight: "100vh",
+    background: "linear-gradient(180deg, #FBFAFF 0%, #F7F5FF 52%, #FBFAFF 100%)",
+    position: "relative",
+    overflowX: "clip",
   },
-  pageHeader: {
+  backgroundHaloOne: {
+    position: "absolute",
+    top: -120,
+    left: -160,
+    width: 420,
+    height: 420,
+    background: "radial-gradient(circle, rgba(249,168,212,0.20), rgba(249,168,212,0))",
+    filter: "blur(20px)",
+  },
+  backgroundHaloTwo: {
+    position: "absolute",
+    top: 140,
+    right: -140,
+    width: 420,
+    height: 420,
+    background: "radial-gradient(circle, rgba(191,219,254,0.22), rgba(191,219,254,0))",
+    filter: "blur(26px)",
+  },
+  backgroundHaloThree: {
+    position: "absolute",
+    bottom: 140,
+    left: "25%",
+    width: 340,
+    height: 340,
+    background: "radial-gradient(circle, rgba(253,224,71,0.12), rgba(253,224,71,0))",
+    filter: "blur(24px)",
+  },
+  main: {
+    width: "min(calc(100vw - 24px), 860px)",
+    margin: "0 auto",
+    padding: "24px 0 0",
+    position: "relative",
+    zIndex: 1,
+  },
+  topRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    marginBottom: 34,
+  },
+  headingRow: {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 24,
-    gap: 16,
+    gap: 18,
+    marginBottom: 28,
+    position: "relative",
   },
-  pageTitle: {
-    fontSize: 28,
+  dayButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    fontSize: 66,
+    lineHeight: 0.96,
     fontWeight: 800,
-    color: "var(--color-text)",
-    lineHeight: 1.15,
+    color: "#0F1B4C",
+    cursor: "pointer",
+    letterSpacing: "-0.05em",
+  },
+  dayButtonLabel: {
+    transform: "translateY(2px)",
+  },
+  dayButtonSubtitle: {
+    marginTop: 10,
+    fontSize: 24,
+    color: "#6B7280",
+    fontWeight: 500,
+  },
+  dayPicker: {
+    position: "absolute",
+    top: 112,
+    left: 0,
+    width: 300,
+    padding: 10,
+    borderRadius: 24,
+    border: "1px solid rgba(255,255,255,0.92)",
+    background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.86))",
+    boxShadow: "0 28px 70px rgba(31,41,55,0.13)",
+    backdropFilter: "blur(18px)",
+    zIndex: 10,
+  },
+  dayPickerItem: {
+    width: "100%",
+    border: "none",
+    borderRadius: 18,
+    background: "transparent",
+    padding: "14px 16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  dayPickerTitle: {
+    display: "block",
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#111827",
     marginBottom: 4,
   },
-  pageDate: {
-    fontSize: 14,
-    color: "var(--color-text-secondary)",
+  dayPickerSubtitle: {
+    display: "block",
+    fontSize: 13,
+    color: "#6B7280",
   },
-  captureHeaderBtn: {
+  dayPickerCount: {
+    minWidth: 34,
+    height: 34,
+    borderRadius: 999,
+    background: "rgba(91,61,245,0.12)",
+    color: "#5B3DF5",
     display: "flex",
     alignItems: "center",
-    gap: 6,
-    padding: "8px 16px",
-    background: "linear-gradient(135deg, #6366F1, #7C3AED)",
-    border: "none",
-    borderRadius: 20,
-    color: "#fff",
+    justifyContent: "center",
     fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
+    fontWeight: 700,
+  },
+  headerActions: {
+    display: "flex",
+    gap: 14,
     flexShrink: 0,
-    boxShadow: "0 2px 12px rgba(99,102,241,0.25)",
+    paddingTop: 8,
+  },
+  loadingCard: {
+    minHeight: 220,
+    borderRadius: 34,
+    background: "linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.76))",
+    border: "1px solid rgba(255,255,255,0.9)",
+    boxShadow: "0 28px 80px rgba(31,41,55,0.08)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 18,
+    marginBottom: 28,
+  },
+  loadingSpinner: {
+    width: 34,
+    height: 34,
+    borderRadius: "50%",
+    border: "3px solid rgba(91,61,245,0.12)",
+    borderTopColor: "#5B3DF5",
+  },
+  loadingText: {
+    fontSize: 17,
+    color: "#6B7280",
+    fontWeight: 500,
   },
   upNextCard: {
-    background: "linear-gradient(135deg, #EDE9FE, #E0E7FF)",
-    border: "1.5px solid rgba(99,102,241,0.2)",
-    borderRadius: 20,
-    padding: "18px 20px",
-    marginBottom: 28,
-    boxShadow: "0 4px 20px rgba(99,102,241,0.10)",
+    borderRadius: 36,
+    padding: "24px 28px 30px",
+    marginBottom: 24,
+    background: "linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,247,255,0.84))",
+    border: "1px solid rgba(248,212,255,0.72)",
+    boxShadow: "0 32px 90px rgba(31,41,55,0.08)",
+    backdropFilter: "blur(20px)",
   },
-  upNextLabel: {
+  upNextMetaRow: {
     display: "flex",
     alignItems: "center",
-    gap: 6,
-    fontSize: 12,
+    justifyContent: "space-between",
+    gap: 16,
+    marginBottom: 14,
+    flexWrap: "wrap",
+  },
+  upNextBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "10px 16px",
+    borderRadius: 999,
+    background: "rgba(91,61,245,0.08)",
+    color: "#5B3DF5",
+    fontSize: 17,
     fontWeight: 700,
-    color: "#6366F1",
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    marginBottom: 12,
+  },
+  upNextTimePill: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "10px 16px",
+    borderRadius: 18,
+    background: "rgba(255,255,255,0.86)",
+    color: "#374151",
+    fontSize: 17,
+    fontWeight: 600,
   },
   upNextBody: {
     display: "flex",
     alignItems: "center",
-    gap: 14,
+    gap: 20,
+    flexWrap: "wrap",
   },
-  upNextKindBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    background: "#fff",
+  iconPanel: {
+    width: 104,
+    height: 104,
+    borderRadius: 30,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    boxShadow: "0 2px 8px rgba(99,102,241,0.15)",
   },
   upNextTitle: {
-    fontSize: 17,
-    fontWeight: 700,
-    color: "var(--color-text)",
-    marginBottom: 4,
+    fontSize: 28,
+    fontWeight: 800,
+    lineHeight: 1.06,
+    color: "#0F1B4C",
+    marginBottom: 12,
   },
-  upNextMeta: {
+  upNextLocation: {
     display: "flex",
-    gap: 6,
-    fontSize: 13,
-    color: "var(--color-text-secondary)",
-    flexWrap: "wrap",
-  },
-  upNextAction: {
-    padding: "8px 16px",
-    background: "#6366F1",
-    borderRadius: 20,
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: 700,
-    textDecoration: "none",
-    flexShrink: 0,
-    boxShadow: "0 2px 8px rgba(99,102,241,0.25)",
-  },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: 700,
-    color: "var(--color-text-muted)",
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    marginBottom: 8,
-    paddingLeft: 4,
-  },
-  sectionList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-    marginBottom: 20,
-  },
-  toatCard: {
-    background: "var(--color-card)",
-    border: "1px solid var(--color-border)",
-    borderRadius: 16,
-    padding: "14px 16px",
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    cursor: "pointer",
-    transition: "box-shadow 0.15s, transform 0.1s",
-    boxShadow: "0 1px 4px rgba(99,102,241,0.05)",
-  },
-  tierDot: {
-    width: 6,
-    height: 6,
-    borderRadius: "50%",
-    flexShrink: 0,
-  },
-  kindIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 17,
-    flexShrink: 0,
-  },
-  toatTitle: {
-    fontSize: 15,
-    fontWeight: 600,
-    color: "var(--color-text)",
-    marginBottom: 3,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  toatMeta: {
-    display: "flex",
-    gap: 6,
-    fontSize: 12,
-    color: "var(--color-text-secondary)",
-    flexWrap: "wrap",
-  },
-  toatTime: { fontWeight: 600, color: "var(--color-primary)" },
-  toatLocation: {
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    maxWidth: 200,
-  },
-  emptyState: {
-    textAlign: "center",
-    padding: "60px 20px",
-  },
-  emptyIcon: {
-    fontSize: 52,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: "var(--color-text)",
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 15,
-    color: "var(--color-text-secondary)",
-    marginBottom: 24,
-    lineHeight: 1.5,
-  },
-  emptyBtn: {
-    display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    padding: "12px 24px",
-    background: "linear-gradient(135deg, #6366F1, #7C3AED)",
-    border: "none",
-    borderRadius: 20,
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: 600,
-    cursor: "pointer",
-    boxShadow: "0 4px 16px rgba(99,102,241,0.25)",
+    fontSize: 20,
+    color: "#6B7280",
+    marginBottom: 10,
   },
-  fab: {
-    position: "fixed",
-    bottom: 28,
-    right: 28,
-    width: 64,
-    height: 64,
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, #6366F1, #EC4899)",
+  upNextCountdown: {
+    fontSize: 22,
+    fontWeight: 600,
+  },
+  primaryPillButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    minHeight: 66,
+    minWidth: 230,
+    padding: "0 26px",
     border: "none",
+    borderRadius: 22,
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 22px 44px rgba(91,61,245,0.24)",
+  },
+  sectionBlock: {
+    marginBottom: 26,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#6B7280",
+    marginBottom: 12,
+    paddingLeft: 116,
+  },
+  sectionRows: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 18,
+  },
+  timelineRow: {
+    display: "grid",
+    gridTemplateColumns: "82px 20px minmax(0, 1fr)",
+    gap: 16,
+    alignItems: "stretch",
+  },
+  timeRailColumn: {
+    paddingTop: 18,
+    textAlign: "left",
+  },
+  timeRailTime: {
+    fontSize: 28,
+    fontWeight: 700,
+    color: "#111827",
+    lineHeight: 1,
+    marginBottom: 8,
+  },
+  timeRailPeriod: {
+    fontSize: 16,
+    fontWeight: 500,
+    color: "#6B7280",
+    lineHeight: 1,
+  },
+  railTrackWrap: {
+    position: "relative",
+    display: "flex",
+    justifyContent: "center",
+  },
+  railLine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 2,
+    background: "linear-gradient(180deg, rgba(209,213,219,0.2), rgba(209,213,219,0.9), rgba(209,213,219,0.2))",
+    borderRadius: 999,
+  },
+  railDot: {
+    position: "absolute",
+    top: 40,
+    width: 18,
+    height: 18,
+    borderRadius: "50%",
+    border: "4px solid rgba(255,255,255,0.96)",
+    boxShadow: "0 10px 20px rgba(91,61,245,0.18)",
+  },
+  toatCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 18,
+    minHeight: 142,
+    padding: "22px 26px",
+    borderRadius: 34,
+    background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.84))",
+    border: "1px solid rgba(255,255,255,0.94)",
+    boxShadow: "0 26px 80px rgba(31,41,55,0.08)",
+    cursor: "pointer",
+    outline: "none",
+  },
+  cardBody: {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  },
+  cardHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 18,
+  },
+  cardTitle: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: "#0F172A",
+    lineHeight: 1.1,
+    marginBottom: 10,
+  },
+  cardMeta: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 18,
+    color: "#6B7280",
+    lineHeight: 1.3,
+  },
+  cardFooter: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  kindPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    padding: "10px 14px",
+    fontSize: 15,
+    fontWeight: 700,
+  },
+  cardActionButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 56,
+    minWidth: 176,
+    padding: "0 18px",
+    border: "none",
+    borderRadius: 18,
+    fontSize: 18,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  clearCard: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 20,
+    padding: "24px 30px",
+    borderRadius: 32,
+    background: "linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,247,239,0.86))",
+    border: "1px solid rgba(255,255,255,0.92)",
+    boxShadow: "0 28px 80px rgba(31,41,55,0.08)",
+    overflow: "hidden",
+  },
+  clearTextWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    flex: 1,
+    minWidth: 0,
+  },
+  clearSparkle: {
+    width: 48,
+    height: 48,
+    borderRadius: "50%",
+    background: "rgba(91,61,245,0.08)",
+    color: "#5B3DF5",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+  },
+  clearHeadline: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#0F172A",
+    marginBottom: 6,
+  },
+  clearSub: {
+    fontSize: 17,
+    color: "#6B7280",
+  },
+  clearScene: {
+    position: "relative",
+    width: 210,
+    height: 80,
+    flexShrink: 0,
+  },
+  clearSceneSun: {
+    position: "absolute",
+    right: 62,
+    bottom: 12,
+    width: 54,
+    height: 54,
+    borderRadius: "50%",
+    background: "radial-gradient(circle, #FDBA74, #F59E0B)",
+    boxShadow: "0 0 0 18px rgba(251,191,36,0.12)",
+  },
+  clearSceneHillOne: {
+    position: "absolute",
+    left: 28,
+    right: 0,
+    bottom: 0,
+    height: 32,
+    borderTopLeftRadius: 60,
+    borderTopRightRadius: 80,
+    background: "linear-gradient(90deg, rgba(244,114,182,0.32), rgba(139,92,246,0.26))",
+  },
+  clearSceneHillTwo: {
+    position: "absolute",
+    left: 72,
+    right: -18,
+    bottom: 0,
+    height: 22,
+    borderTopLeftRadius: 60,
+    borderTopRightRadius: 90,
+    background: "linear-gradient(90deg, rgba(139,92,246,0.2), rgba(56,189,248,0.16))",
+  },
+  emptyCard: {
+    position: "relative",
+    minHeight: 440,
+    borderRadius: 40,
+    padding: "38px 38px 30px",
+    overflow: "hidden",
+    background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,248,252,0.84))",
+    border: "1px solid rgba(255,255,255,0.9)",
+    boxShadow: "0 30px 90px rgba(31,41,55,0.08)",
+  },
+  emptyBadgeWrap: {
+    marginBottom: 20,
+  },
+  emptyBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: "50%",
+    background: "rgba(91,61,245,0.10)",
+    color: "#5B3DF5",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    fontSize: 42,
+    lineHeight: 1,
+    fontWeight: 800,
+    letterSpacing: "-0.04em",
+    color: "#0F1B4C",
+    marginBottom: 16,
+  },
+  emptyBody: {
+    maxWidth: 540,
+    fontSize: 19,
+    lineHeight: 1.55,
+    color: "#6B7280",
+    marginBottom: 26,
+  },
+  emptyCaptureButton: {
+    minHeight: 58,
+    padding: "0 22px",
+    borderRadius: 18,
+    border: "none",
+    background: "linear-gradient(135deg, #5B3DF5, #7C3AED)",
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: 700,
     cursor: "pointer",
-    boxShadow: "0 6px 24px rgba(99,102,241,0.35), 0 2px 8px rgba(0,0,0,0.12)",
-    zIndex: 40,
-    transition: "transform 0.15s, box-shadow 0.15s",
+    boxShadow: "0 22px 44px rgba(91,61,245,0.22)",
+  },
+  emptySun: {
+    position: "absolute",
+    top: -30,
+    right: -20,
+    width: 220,
+    height: 220,
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(253,224,71,0.18), rgba(253,224,71,0))",
+  },
+  emptyGlow: {
+    position: "absolute",
+    left: -60,
+    bottom: 40,
+    width: 220,
+    height: 220,
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(249,168,212,0.18), rgba(249,168,212,0))",
+  },
+  landscape: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 150,
+  },
+  sunDisc: {
+    position: "absolute",
+    right: 92,
+    bottom: 46,
+    width: 88,
+    height: 88,
+    borderRadius: "50%",
+    background: "linear-gradient(180deg, #FDBA74, #FB923C)",
+  },
+  hillOne: {
+    position: "absolute",
+    left: -30,
+    right: 100,
+    bottom: -18,
+    height: 88,
+    borderTopLeftRadius: 120,
+    borderTopRightRadius: 120,
+    background: "linear-gradient(90deg, rgba(244,114,182,0.26), rgba(139,92,246,0.28))",
+  },
+  hillTwo: {
+    position: "absolute",
+    left: 120,
+    right: -10,
+    bottom: -12,
+    height: 72,
+    borderTopLeftRadius: 120,
+    borderTopRightRadius: 120,
+    background: "linear-gradient(90deg, rgba(139,92,246,0.22), rgba(56,189,248,0.18))",
   },
 };

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(idToken);
     const { users } = await getCollections();
 
-    let mongoUser = await users.findOne({ firebaseUid: decoded.uid });
+    const mongoUser = await users.findOne({ firebaseUid: decoded.uid });
     if (!mongoUser) {
       const now = new Date();
       await users.insertOne({

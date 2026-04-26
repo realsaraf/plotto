@@ -20,6 +20,13 @@
 
 **Implementation note:** Code delivery has advanced into Phases 1–3 on web and mobile while several external account/dashboard steps in Phase 0 still remain open.
 
+### Session 2026-04-26 (web onboarding + timeline/detail polish) — completed
+- Reproduced the live `https://toatre.com/signup` handle-submit failure and traced the user-facing crash to an empty-body 500 response from `POST /api/auth/profile`
+- Hardened handle onboarding by returning JSON errors from `POST /api/auth/profile` and by parsing non-JSON error responses safely in `web/src/app/signup/page.tsx`
+- Reworked `web/src/app/timeline/page.tsx` to match the latest mobile-style design direction with the bottom tab bar, floating capture mic, Up Next card, grouped sections, and direct tap-through into toat detail
+- Added shared `web/src/components/mobile-ui.tsx` primitives and a new `web/src/app/toats/[id]/page.tsx` full toat view with kind-aware layouts and quick actions
+- Validation: `npm run lint` (warnings only), `npm run typecheck`, and `npm run build`
+
 ### Session 2026-04-26 (web auth localhost fix) — completed
 - Added `web/src/app/auth/finish/page.tsx` so Firebase email magic-link sign-in has a real completion route
 - Reproduced localhost Google sign-in failure in Playwright MCP and traced it to a stale Next dev server where App Router `/api/*` handlers were returning 404

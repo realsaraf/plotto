@@ -36,8 +36,14 @@ export default function SignupPage() {
         },
         body: JSON.stringify({ handle }),
       });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Failed to save handle");
+
+      let data: { error?: string } | null = null;
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        data = (await res.json()) as { error?: string };
+      }
+
+      if (!res.ok) throw new Error(data?.error ?? "Failed to save handle");
       router.push("/timeline");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

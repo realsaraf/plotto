@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User, isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
@@ -23,28 +23,14 @@ async function createSession(user: User): Promise<{ hasHandle: boolean }> {
 
 export default function AuthFinishPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem("toatre_email_for_link") ?? "";
+  });
   const [status, setStatus] = useState<"checking" | "needs-email" | "working" | "error">("checking");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isSignInWithEmailLink(auth, window.location.href)) {
-      router.replace("/login");
-      return;
-    }
-
-    const storedEmail = window.localStorage.getItem("toatre_email_for_link") ?? "";
-    setEmail(storedEmail);
-
-    if (!storedEmail) {
-      setStatus("needs-email");
-      return;
-    }
-
-    void completeSignIn(storedEmail);
-  }, [router]);
-
-  const completeSignIn = async (emailAddress: string) => {
+  const completeSignIn = useCallback(async (emailAddress: string) => {
     setStatus("working");
     setError(null);
 
@@ -58,7 +44,26 @@ export default function AuthFinishPage() {
       setStatus("error");
       setError("Couldn't finish the magic link sign-in. Request a fresh link and try again.");
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (!isSignInWithEmailLink(auth, window.location.href)) {
+      router.replace("/login");
+      return;
+    }
+
+    if (!email) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      void completeSignIn(email);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [completeSignIn, email, router]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -68,6 +73,8 @@ export default function AuthFinishPage() {
 
     await completeSignIn(email);
   };
+
+  const needsEmail = status === "checking" && !email;
 
   return (
     <main style={styles.page}>
@@ -79,12 +86,12 @@ export default function AuthFinishPage() {
 
         <h1 style={styles.heading}>Finishing sign-in</h1>
         <p style={styles.subtext}>
-          {status === "needs-email"
+          {needsEmail
             ? "Confirm the email address that received your magic link."
             : "Hold on while we bring your timeline back."}
         </p>
 
-        {status === "needs-email" || status === "error" || status === "working" ? (
+        {needsEmail || status === "error" || status === "working" ? (
           <form onSubmit={handleSubmit} style={styles.form}>
             <input
               type="email"
