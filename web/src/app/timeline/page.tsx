@@ -76,6 +76,7 @@ const TIER_COLOR: Record<ToatTier, string> = {
 
 export default function TimelinePage() {
   const router = useRouter();
+  const openCapture = () => router.push("/capture?autostart=1");
   const { user } = useAuth();
   const [toats, setToats] = useState<DemoToat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,7 +145,7 @@ export default function TimelinePage() {
             </p>
           </div>
           <button
-            onClick={() => router.push("/capture")}
+            onClick={openCapture}
             style={styles.captureHeaderBtn}
             aria-label="New capture"
           >
@@ -232,7 +233,7 @@ export default function TimelinePage() {
               Tap the mic to tell Toatre what&apos;s on your mind.
             </p>
             <button
-              onClick={() => router.push("/capture")}
+              onClick={openCapture}
               style={styles.emptyBtn}
             >
               <MicIcon size={16} color="#fff" /> Start capturing
@@ -246,7 +247,7 @@ export default function TimelinePage() {
 
       {/* ── Floating capture button ── */}
       <button
-        onClick={() => router.push("/capture")}
+        onClick={openCapture}
         style={styles.fab}
         aria-label="Open mic capture"
       >

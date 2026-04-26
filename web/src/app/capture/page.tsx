@@ -9,6 +9,8 @@ type CaptureStatus = "idle" | "listening" | "processing" | "review" | "error";
 
 const WAVEFORM_BARS = 20;
 
+const MIN_ANALYSER_FFT_SIZE = 32;
+
 type ToatKind = "task" | "event" | "meeting" | "errand" | "deadline" | "idea";
 type ToatTier = "urgent" | "important" | "regular";
 
@@ -33,6 +35,28 @@ const KIND_META: Record<ToatKind, { emoji: string; color: string; bg: string }> 
   idea:     { emoji: "💡", color: "#059669", bg: "#D1FAE5" },
 };
 
+function getAnalyserFftSize(barCount: number): number {
+  return 2 ** Math.ceil(Math.log2(Math.max(barCount * 4, MIN_ANALYSER_FFT_SIZE)));
+}
+
+function getCaptureStartErrorMessage(error: unknown): string {
+  if (error instanceof DOMException) {
+    if (error.name === "NotAllowedError" || error.name === "SecurityError") {
+      return "Mic access denied. Check browser permissions.";
+    }
+
+    if (error.name === "NotFoundError") {
+      return "No microphone found. Check your input device.";
+    }
+
+    if (error.name === "NotReadableError" || error.name === "AbortError") {
+      return "Mic is busy or unavailable. Close other apps using it and try again.";
+    }
+  }
+
+  return "Couldn't start the mic. Try again.";
+}
+
 export default function CapturePage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -46,26 +70,66 @@ export default function CapturePage() {
   const [errorMsg, setErrorMsg] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const hasAutoStartedRef = useRef(false);
 
   useEffect(() => { return () => { stopAll(); }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stopAll = () => {
-    mediaRecorderRef.current?.stop();
-    audioCtxRef.current?.close();
+  const resetWaveform = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
-    if (timerRef.current) clearInterval(timerRef.current);
+    animFrameRef.current = 0;
     setBarHeights(Array(WAVEFORM_BARS).fill(8));
-  };
+  }, []);
 
-  const startWaveform = (stream: MediaStream) => {
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }, []);
+
+  const closeAudioContext = useCallback(() => {
+    const audioCtx = audioCtxRef.current;
+    audioCtxRef.current = null;
+    analyserRef.current = null;
+
+    if (!audioCtx || audioCtx.state === "closed") {
+      return;
+    }
+
+    void audioCtx.close().catch((error) => {
+      console.error("[capture/audio-context]", error);
+    });
+  }, []);
+
+  const stopAll = useCallback(() => {
+    clearTimer();
+    resetWaveform();
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    mediaRecorderRef.current = null;
+
+    closeAudioContext();
+    stopStream();
+  }, [clearTimer, closeAudioContext, resetWaveform, stopStream]);
+
+  const startWaveform = useCallback((stream: MediaStream) => {
     const ctx = new AudioContext();
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = WAVEFORM_BARS * 4;
+    analyser.fftSize = getAnalyserFftSize(WAVEFORM_BARS);
     ctx.createMediaStreamSource(stream).connect(analyser);
     audioCtxRef.current = ctx;
     analyserRef.current = analyser;
@@ -79,24 +143,27 @@ export default function CapturePage() {
       animFrameRef.current = requestAnimationFrame(draw);
     };
     draw();
-  };
+  }, []);
 
   const getIdToken = useCallback(async () => (user ? user.getIdToken() : null), [user]);
 
-  const startCapture = async () => {
+  const startCapture = useCallback(async () => {
     setTranscript(""); setElapsed(0); setToats([]); setSelected([]); setErrorMsg("");
     setStatus("listening");
     chunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       startWaveform(stream);
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        cancelAnimationFrame(animFrameRef.current);
-        setBarHeights(Array(WAVEFORM_BARS).fill(8));
+        mediaRecorderRef.current = null;
+        stopStream();
+        clearTimer();
+        resetWaveform();
+        closeAudioContext();
         setStatus("processing");
         const token = await getIdToken();
         if (!token) { setStatus("error"); setErrorMsg("Sign in required."); return; }
@@ -120,16 +187,40 @@ export default function CapturePage() {
       };
       recorder.start();
       timerRef.current = setInterval(() => setElapsed((n) => n + 1), 1000);
-    } catch {
-      setStatus("error"); setErrorMsg("Mic access denied. Check permissions.");
+    } catch (error) {
+      stopStream();
+      clearTimer();
+      resetWaveform();
+      closeAudioContext();
+      console.error("[capture/start]", error);
+      setStatus("error"); setErrorMsg(getCaptureStartErrorMessage(error));
     }
-  };
+  }, [clearTimer, closeAudioContext, getIdToken, resetWaveform, startWaveform, stopStream]);
+
+  useEffect(() => {
+    const shouldAutoStart = new URLSearchParams(window.location.search).get("autostart") === "1";
+
+    if (!shouldAutoStart || hasAutoStartedRef.current || status !== "idle") {
+      return;
+    }
+
+    hasAutoStartedRef.current = true;
+    void startCapture();
+  }, [startCapture, status]);
 
   const stopCapture = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    mediaRecorderRef.current?.stop();
-    audioCtxRef.current?.close();
+    clearTimer();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    closeAudioContext();
   };
+
+  const goToTimeline = useCallback(() => {
+    stopAll();
+    router.push("/timeline");
+  }, [router, stopAll]);
 
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
@@ -150,7 +241,7 @@ export default function CapturePage() {
             selected={selected}
             onToggle={(i) => setSelected((s) => s.map((v, j) => (j === i ? !v : v)))}
             onToggleAll={() => { const all = selected.every(Boolean); setSelected(selected.map(() => !all)); }}
-            onAddToTimeline={() => router.push("/timeline")}
+            onAddToTimeline={goToTimeline}
             selectedCount={selectedCount}
           />
         </main>
@@ -182,7 +273,7 @@ export default function CapturePage() {
             {isActive && <><span style={S.dot} /><span style={{ color: "var(--color-primary)", fontWeight: 600 }}>Listening…</span></>}
             {isProcessing && <><SpinIcon /><span style={{ color: "var(--color-primary)", fontWeight: 600 }}>Thinking…</span></>}
             {status === "idle" && <span style={{ color: "var(--color-text-muted)", fontSize: 14 }}>Ready when you are</span>}
-            {status === "error" && <span style={{ color: "#EF4444", fontWeight: 600 }}>Couldn&apos;t hear you. Try again.</span>}
+            {status === "error" && <span style={{ color: "#EF4444", fontWeight: 600 }}>{errorMsg || "Couldn't start the mic. Try again."}</span>}
           </div>
 
           <div style={S.waveRow}>
@@ -226,7 +317,7 @@ export default function CapturePage() {
 
         {(isActive || isProcessing || status === "error") && (
           <div style={{ textAlign: "center", marginTop: 28 }}>
-            <button onClick={() => { stopAll(); router.back(); }} style={S.cancelBtn}>Cancel</button>
+            <button onClick={goToTimeline} style={S.cancelBtn}>Cancel</button>
           </div>
         )}
       </main>
@@ -386,18 +477,13 @@ function WaveIcon() {
   );
 }
 
-function MicIcon({ size = 28 }: { size?: number }) {
+function MicIcon({ size = 52 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden>
-      <defs>
-        <linearGradient id="mic-g" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#8B5CF6" /><stop offset="100%" stopColor="#EC4899" />
-        </linearGradient>
-      </defs>
-      <rect x={10} y={2} width={8} height={14} rx={4} fill="url(#mic-g)" />
-      <path d="M5 13a9 9 0 0 0 18 0" stroke="#8B5CF6" strokeWidth={2} strokeLinecap="round" />
-      <line x1={14} y1={22} x2={14} y2={26} stroke="#8B5CF6" strokeWidth={2} strokeLinecap="round" />
-      <line x1={10} y1={26} x2={18} y2={26} stroke="#8B5CF6" strokeWidth={2} strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 52 52" fill="none" aria-hidden>
+      <rect x={17} y={6} width={18} height={26} rx={9} fill="#FFFFFF" />
+      <path d="M12 24C12 31.732 18.268 38 26 38C33.732 38 40 31.732 40 24" stroke="#FFFFFF" strokeWidth={5} strokeLinecap="round" />
+      <path d="M26 38V45" stroke="#FFFFFF" strokeWidth={5} strokeLinecap="round" />
+      <path d="M18 46H34" stroke="#FFFFFF" strokeWidth={5} strokeLinecap="round" />
     </svg>
   );
 }
@@ -443,10 +529,10 @@ const S: Record<string, React.CSSProperties> = {
   waveRow: { display: "flex", alignItems: "center", gap: 16, width: "100%", justifyContent: "center" },
   barGroup: { display: "flex", alignItems: "center", gap: 4, height: 64 },
   bar: { width: 4, borderRadius: 3, transition: "height 0.08s ease" },
-  micBtn: { position: "relative", width: 110, height: 110, borderRadius: "50%", background: "#fff", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, boxShadow: "0 4px 24px rgba(99,102,241,0.18), 0 0 0 3px rgba(99,102,241,0.25)", transition: "transform 0.15s, box-shadow 0.15s" },
-  micBtnActive: { boxShadow: "0 4px 24px rgba(99,102,241,0.25), 0 0 0 6px rgba(99,102,241,0.15)", transform: "scale(1.04)" },
-  micRing: { position: "absolute", inset: -6, borderRadius: "50%", border: "3px solid transparent", background: "linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg,#6366F1,#F59E0B) border-box", pointerEvents: "none" },
-  stopSquare: { width: 26, height: 26, borderRadius: 6, background: "linear-gradient(135deg, #EC4899, #8B5CF6)" },
+  micBtn: { position: "relative", width: 138, height: 138, borderRadius: "50%", background: "linear-gradient(145deg, #5B6CFF 0%, #7867FF 22%, #D946EF 56%, #FF6B4A 82%, #FDBA3B 100%)", border: "6px solid rgba(255,255,255,0.96)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, boxShadow: "0 18px 48px rgba(99,102,241,0.22), 0 18px 72px rgba(236,72,153,0.20)", transition: "transform 0.15s, box-shadow 0.15s" },
+  micBtnActive: { boxShadow: "0 22px 56px rgba(99,102,241,0.28), 0 24px 84px rgba(236,72,153,0.24)", transform: "scale(1.04)" },
+  micRing: { position: "absolute", inset: -26, borderRadius: "50%", border: "1px solid rgba(129, 140, 248, 0.18)", background: "radial-gradient(circle, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.12) 42%, rgba(255,255,255,0) 72%)", pointerEvents: "none" },
+  stopSquare: { width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.95)" },
   timer: { fontSize: 22, fontWeight: 700, color: "var(--color-primary)", letterSpacing: "0.05em", fontVariantNumeric: "tabular-nums" },
   privacy: { display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#9CA3AF", justifyContent: "center", marginBottom: 8 },
   tip: { display: "flex", alignItems: "flex-start", gap: 10, padding: "14px 18px", background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 14, fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 24 },

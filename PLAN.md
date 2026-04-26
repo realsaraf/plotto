@@ -25,6 +25,11 @@
 - Reproduced localhost Google sign-in failure in Playwright MCP and traced it to a stale Next dev server where App Router `/api/*` handlers were returning 404
 - Cleared `web/.next`, restarted `npm run dev`, and verified `/api/auth/session` recovered and Google sign-in reached `/timeline`
 
+### Session 2026-04-26 (web capture mic fix) — completed
+- Reproduced the `/capture` mic-start failure in Playwright MCP with microphone permission granted
+- Traced the crash to `AnalyserNode.fftSize = 80`, which throws `IndexSizeError` because Web Audio requires a power-of-two FFT size
+- Updated the capture page to use a valid analyser FFT size, keep startup errors accurate, and verified `/capture` records, uploads to `/api/captures`, and reaches the review state
+
 ### Session 2026-04-25 (CI unblocking) — completed
 - Created iOS Distribution cert `SJ5FF9432Y` (iPhone Distribution: Saraf Talukder, expires 2027-04-25)
 - Generated private key + P12 (`ios_distribution.p12`, password: `toatre2026`)
