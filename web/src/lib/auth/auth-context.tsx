@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import { auth } from "@/lib/firebase/client";
 import {
   onAuthStateChanged,
-  signInWithRedirect,
+  signInWithPopup,
   GoogleAuthProvider,
   OAuthProvider,
   sendSignInLinkToEmail,
@@ -85,12 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async (): Promise<void> => {
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    await signInWithPopup(auth, provider);
   };
 
   const signInWithApple = async (): Promise<void> => {
     const provider = new OAuthProvider("apple.com");
-    await signInWithRedirect(auth, provider);
+    await signInWithPopup(auth, provider);
   };
 
   const sendMagicLink = async (email: string): Promise<void> => {
