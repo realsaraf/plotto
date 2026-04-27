@@ -593,7 +593,7 @@ export default function ToatDetailPage() {
   const endDate = toat.endDatetime ? new Date(toat.endDatetime) : null;
   const phone = extractPhone(toat);
   const maps = mapHref(toat.location);
-  const isPhoneViewport = viewportWidth !== null && viewportWidth <= 430;
+  const isPhoneViewport = viewportWidth === null || viewportWidth <= 768;
 
   return (
     <div style={styles.page}>

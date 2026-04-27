@@ -457,7 +457,7 @@ export default function TimelinePage() {
   const upNext = getUpNext(activeToats, new Date());
   const lastToat = visibleToats[visibleToats.length - 1] ?? null;
   const loading = authLoading || (Boolean(user) && !hasLoadedData);
-  const isPhoneViewport = viewportWidth !== null && viewportWidth <= 430;
+  const isPhoneViewport = viewportWidth === null || viewportWidth <= 768;
 
   const markDone = async (toat: TimelineToat) => {
     if (!user || finishingToatId) return;
