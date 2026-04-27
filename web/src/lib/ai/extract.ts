@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { getOpenAI, MODELS } from "./openai";
+import { MODELS } from "./openai";
+import { flushObservedOpenAI, getObservedOpenAI } from "./langfuse";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -39,33 +40,46 @@ function getSystemPrompt(nowIso: string, timezone: string): string {
 
 export async function extractToats(
   transcript: string,
-  options: { timezone?: string; now?: Date } = {}
+  options: { timezone?: string; now?: Date; userId?: string } = {}
 ): Promise<ExtractionResult> {
   const now = options.now ?? new Date();
   const timezone = options.timezone ?? "UTC";
   const nowIso = now.toISOString();
 
-  const openai = getOpenAI();
-
-  const completion = await openai.chat.completions.create({
-    model: MODELS.extract,
-    temperature: 0,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: getSystemPrompt(nowIso, timezone),
-      },
-      {
-        role: "user",
-        content: transcript,
-      },
-    ],
+  const openai = getObservedOpenAI({
+    traceName: "capture.extract-toats",
+    generationName: "capture.extract-toats",
+    userId: options.userId,
+    tags: ["capture", "extract"],
+    metadata: {
+      timezone,
+      transcriptLength: transcript.length,
+    },
   });
 
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error("Empty response from extraction model");
+  try {
+    const completion = await openai.chat.completions.create({
+      model: MODELS.extract,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: getSystemPrompt(nowIso, timezone),
+        },
+        {
+          role: "user",
+          content: transcript,
+        },
+      ],
+    });
 
-  const parsed = JSON.parse(raw);
-  return ExtractionResultSchema.parse(parsed);
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty response from extraction model");
+
+    const parsed = JSON.parse(raw);
+    return ExtractionResultSchema.parse(parsed);
+  } finally {
+    await flushObservedOpenAI(openai);
+  }
 }

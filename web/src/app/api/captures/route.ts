@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/require-user";
 import { getCollections } from "@/lib/mongo/collections";
-import { getOpenAI, MODELS } from "@/lib/ai/openai";
+import { MODELS } from "@/lib/ai/openai";
 import { extractToats } from "@/lib/ai/extract";
+import { flushObservedOpenAI, getObservedOpenAI } from "@/lib/ai/langfuse";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
@@ -49,7 +50,17 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await (audioFile as Blob).arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const openai = getOpenAI();
+    const openai = getObservedOpenAI({
+      traceName: "capture.transcribe",
+      generationName: "capture.transcribe",
+      userId: user.uid,
+      tags: ["capture", "transcribe"],
+      metadata: {
+        timezone,
+        mimeType: audioFile.type || "audio/webm",
+        bytes: buffer.byteLength,
+      },
+    });
     // Whisper requires a File-like with a .name attribute
     const file = new File([buffer], "audio.webm", { type: audioFile.type || "audio/webm" });
 
@@ -63,6 +74,8 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error("[captures] Whisper error:", err);
       return NextResponse.json({ error: "Transcription failed" }, { status: 502 });
+    } finally {
+      await flushObservedOpenAI(openai);
     }
   } else {
     // JSON mode — transcript provided by client (on-device STT)
@@ -84,7 +97,7 @@ export async function POST(request: NextRequest) {
   // ── Extract toats ───────────────────────────────────────────────────────────
   let extraction;
   try {
-    extraction = await extractToats(transcript, { timezone, now: new Date() });
+    extraction = await extractToats(transcript, { timezone, now: new Date(), userId: user.uid });
   } catch (err) {
     console.error("[captures] Extraction error:", err);
     return NextResponse.json({ error: "Extraction failed" }, { status: 502 });

@@ -293,15 +293,17 @@ function InfoRow({
   title,
   subtitle,
   trailing,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   title: string;
   subtitle?: string | null;
   trailing?: React.ReactNode;
+  onClick?: () => void;
 }) {
-  return (
-    <div style={styles.infoRow}>
+  const content = (
+    <>
       <span style={styles.infoRowIcon}>{icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={styles.infoRowLabel}>{label}</p>
@@ -309,6 +311,20 @@ function InfoRow({
         {subtitle ? <p style={styles.infoRowSubtitle}>{subtitle}</p> : null}
       </div>
       {trailing}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} style={{ ...styles.infoRow, ...styles.infoRowButton }}>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div style={styles.infoRow}>
+      {content}
     </div>
   );
 }
@@ -366,8 +382,22 @@ export default function ToatDetailPage() {
   const [actionState, setActionState] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
 
   const now = new Date();
+
+  useEffect(() => {
+    const updateViewportWidth = () => {
+      setViewportWidth(window.innerWidth);
+    };
+
+    updateViewportWidth();
+    window.addEventListener("resize", updateViewportWidth);
+
+    return () => {
+      window.removeEventListener("resize", updateViewportWidth);
+    };
+  }, []);
 
   useEffect(() => {
     if (!params.id) return;
@@ -553,6 +583,7 @@ export default function ToatDetailPage() {
   const endDate = toat.endDatetime ? new Date(toat.endDatetime) : null;
   const phone = extractPhone(toat);
   const maps = mapHref(toat.location);
+  const isPhoneViewport = viewportWidth !== null && viewportWidth <= 430;
 
   return (
     <div style={styles.page}>
@@ -560,20 +591,20 @@ export default function ToatDetailPage() {
       <div style={styles.backgroundHaloTwo} />
       <div style={styles.backgroundHaloThree} />
 
-      <main style={styles.main}>
-        <section style={styles.topBar}>
+      <main style={{ ...styles.main, ...(isPhoneViewport ? styles.mainCompact : {}) }}>
+        <section style={{ ...styles.topBar, ...(isPhoneViewport ? styles.topBarCompact : {}) }}>
           <CircleIconButton label="Back" onClick={() => router.back()}>
-            <BackIcon size={28} />
+            <BackIcon size={isPhoneViewport ? 24 : 28} />
           </CircleIconButton>
 
-          <div style={styles.topBarRight}>
+          <div style={{ ...styles.topBarRight, ...(isPhoneViewport ? styles.topBarRightCompact : {}) }}>
             <UserAvatar user={user} />
             <CircleIconButton label="Share" onClick={() => void shareToat()}>
-              <ShareIcon size={24} />
+              <ShareIcon size={isPhoneViewport ? 20 : 24} />
             </CircleIconButton>
             <div style={{ position: "relative" }}>
               <CircleIconButton label="More actions" onClick={() => setMenuOpen((value) => !value)}>
-                <MoreIcon size={24} />
+                <MoreIcon size={isPhoneViewport ? 20 : 24} />
               </CircleIconButton>
               {menuOpen ? (
                 <div style={styles.menuCard}>
@@ -587,9 +618,9 @@ export default function ToatDetailPage() {
           </div>
         </section>
 
-        <section style={styles.heroSection}>
-          <div style={{ ...styles.heroIconWrap, background: visual.gradient }}>
-            <Icon size={46} />
+        <section style={{ ...styles.heroSection, ...(isPhoneViewport ? styles.heroSectionCompact : {}) }}>
+          <div style={{ ...styles.heroIconWrap, ...(isPhoneViewport ? styles.heroIconWrapCompact : {}), background: visual.gradient }}>
+            <Icon size={isPhoneViewport ? 34 : 46} />
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -597,33 +628,33 @@ export default function ToatDetailPage() {
               {variant === "appointment" ? <span style={{ ...styles.heroKicker, color: visual.accent }}>• {visual.kicker.toUpperCase()}</span> : null}
               {heroChip ? <DetailBadge text={heroChip.text} style={heroChip.style} accent={visual.accent} /> : null}
             </div>
-            <h1 style={styles.heroTitle}>{toat.title}</h1>
+            <h1 style={{ ...styles.heroTitle, ...(isPhoneViewport ? styles.heroTitleCompact : {}) }}>{toat.title}</h1>
 
             {variant === "meeting" ? (
               <div style={styles.heroMeetingMeta}>
-                <span style={styles.heroMetaChip}><VideoGlyph size={20} /> {toat.link ? "Meeting link" : "Meeting"}</span>
+                <span style={{ ...styles.heroMetaChip, ...(isPhoneViewport ? styles.heroMetaChipCompact : {}) }}><VideoGlyph size={isPhoneViewport ? 16 : 20} /> {toat.link ? "Meeting link" : "Meeting"}</span>
                 {toat.people.length ? (
                   <div style={styles.peopleRow}>
                     {toat.people.slice(0, 4).map((person) => (
-                      <span key={person} style={styles.personBadge}>{initials(person)}</span>
+                      <span key={person} style={{ ...styles.personBadge, ...(isPhoneViewport ? styles.personBadgeCompact : {}) }}>{initials(person)}</span>
                     ))}
-                    {toat.people.length > 4 ? <span style={styles.personOverflow}>+{toat.people.length - 4}</span> : null}
+                    {toat.people.length > 4 ? <span style={{ ...styles.personOverflow, ...(isPhoneViewport ? styles.personBadgeCompact : {}) }}>+{toat.people.length - 4}</span> : null}
                   </div>
                 ) : null}
               </div>
             ) : null}
 
-            {toat.location ? <p style={styles.heroLocation}><LocationIcon size={22} /> {toat.location}</p> : null}
-            {variant === "event" && toat.link ? <p style={styles.heroSecondary}><TicketGlyph size={20} /> Tickets ready</p> : null}
-            {variant === "general" && startDate ? <p style={styles.heroSecondary}><ClockIcon size={20} /> {formatDate(startDate)}</p> : null}
+            {toat.location ? <p style={{ ...styles.heroLocation, ...(isPhoneViewport ? styles.heroLocationCompact : {}) }}><LocationIcon size={isPhoneViewport ? 18 : 22} /> {toat.location}</p> : null}
+            {variant === "event" && toat.link ? <p style={{ ...styles.heroSecondary, ...(isPhoneViewport ? styles.heroSecondaryCompact : {}) }}><TicketGlyph size={isPhoneViewport ? 16 : 20} /> Tickets ready</p> : null}
+            {variant === "general" && startDate ? <p style={{ ...styles.heroSecondary, ...(isPhoneViewport ? styles.heroSecondaryCompact : {}) }}><ClockIcon size={isPhoneViewport ? 16 : 20} /> {formatDate(startDate)}</p> : null}
           </div>
         </section>
 
         {flash ? <div style={styles.flash}>{flash}</div> : null}
 
         {variant === "meeting" ? (
-          <button type="button" onClick={openPrimaryAction} style={{ ...styles.fullWidthPrimary, background: visual.gradient }}>
-            <VideoGlyph size={24} /> {primaryAction.label}
+          <button type="button" onClick={openPrimaryAction} style={{ ...styles.fullWidthPrimary, ...(isPhoneViewport ? styles.fullWidthPrimaryCompact : {}), background: visual.gradient }}>
+            <VideoGlyph size={isPhoneViewport ? 20 : 24} /> {primaryAction.label}
           </button>
         ) : null}
 
@@ -644,6 +675,7 @@ export default function ToatDetailPage() {
                   label="Where"
                   title={toat.location}
                   subtitle={maps ? "Open in Maps" : null}
+                  onClick={maps ? () => window.open(maps, "_blank", "noopener,noreferrer") : undefined}
                   trailing={maps ? <span style={{ color: "#6B7280" }}><ChevronRightIcon size={18} /></span> : undefined}
                 />
               ) : null}
@@ -703,9 +735,9 @@ export default function ToatDetailPage() {
         {variant === "meeting" ? (
           <>
             <SectionCard title="Meeting details">
-              {startDate ? <InfoRow icon={<ClockIcon size={22} />} label="When" title={`${formatDate(startDate)} · ${formatTime(startDate)}`} subtitle={endDate ? `Ends at ${formatTime(endDate)}` : null} trailing={<span style={{ color: "#6B7280" }}><ChevronRightIcon size={18} /></span>} /> : null}
-              {toat.link ? <InfoRow icon={<VideoGlyph size={22} />} label="Link" title="Open meeting room" subtitle={toat.link.replace(/^https?:\/\//, "")} trailing={<span style={{ color: "#6B7280" }}><ChevronRightIcon size={18} /></span>} /> : null}
-              <InfoRow icon={<MessageGlyph size={22} />} label="People" title={`${toat.people.length || 1} people`} subtitle={toat.people.length ? toat.people.join(", ") : "Just you so far"} trailing={<span style={{ color: "#6B7280" }}><ChevronRightIcon size={18} /></span>} />
+              {startDate ? <InfoRow icon={<ClockIcon size={22} />} label="When" title={`${formatDate(startDate)} · ${formatTime(startDate)}`} subtitle={endDate ? `Ends at ${formatTime(endDate)}` : null} /> : null}
+              {toat.link ? <InfoRow icon={<VideoGlyph size={22} />} label="Link" title="Open meeting room" subtitle={toat.link.replace(/^https?:\/\//, "")} onClick={() => window.open(toat.link!, "_blank", "noopener,noreferrer")} trailing={<span style={{ color: "#6B7280" }}><ChevronRightIcon size={18} /></span>} /> : null}
+              <InfoRow icon={<MessageGlyph size={22} />} label="People" title={`${toat.people.length || 1} people`} subtitle={toat.people.length ? toat.people.join(", ") : "Just you so far"} />
             </SectionCard>
 
             <SectionCard title="Agenda" action={<button type="button" style={styles.inlineGhost}><EditIcon size={18} /> Edit</button>}>
@@ -722,14 +754,14 @@ export default function ToatDetailPage() {
 
             {toat.link ? (
               <SectionCard title="Attachment">
-                <div style={styles.attachmentRow}>
+                <button type="button" onClick={() => window.open(toat.link!, "_blank", "noopener,noreferrer")} style={{ ...styles.attachmentRow, ...styles.attachmentRowButton }}>
                   <span style={{ ...styles.attachmentIcon, color: visual.accent, background: visual.soft }}><DocumentIcon size={24} /></span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={styles.attachmentTitle}>Meeting link</p>
                     <p style={styles.attachmentSubtitle}>{toat.link.replace(/^https?:\/\//, "")}</p>
                   </div>
                   <span style={{ color: visual.accent }}><ChevronRightIcon size={20} /></span>
-                </div>
+                </button>
               </SectionCard>
             ) : null}
 
@@ -992,6 +1024,10 @@ const styles: Record<string, React.CSSProperties> = {
     position: "relative",
     zIndex: 1,
   },
+  mainCompact: {
+    width: "min(calc(100vw - 18px), 860px)",
+    padding: "16px 0 28px",
+  },
   topBar: {
     display: "flex",
     alignItems: "flex-start",
@@ -999,16 +1035,27 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
     marginBottom: 34,
   },
+  topBarCompact: {
+    gap: 10,
+    marginBottom: 20,
+  },
   topBarRight: {
     display: "flex",
     alignItems: "flex-start",
     gap: 12,
+  },
+  topBarRightCompact: {
+    gap: 8,
   },
   heroSection: {
     display: "flex",
     alignItems: "flex-start",
     gap: 26,
     marginBottom: 24,
+  },
+  heroSectionCompact: {
+    gap: 14,
+    marginBottom: 18,
   },
   heroIconWrap: {
     width: 138,
@@ -1019,6 +1066,11 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     boxShadow: "0 28px 60px rgba(91,61,245,0.18)",
     flexShrink: 0,
+  },
+  heroIconWrapCompact: {
+    width: 88,
+    height: 88,
+    borderRadius: 26,
   },
   heroKickerRow: {
     display: "flex",
@@ -1044,27 +1096,40 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
   },
   heroTitle: {
-    fontSize: 64,
+    fontSize: "clamp(40px, 10vw, 60px)",
     lineHeight: 0.96,
     letterSpacing: "-0.05em",
     color: "#0F1B4C",
     fontWeight: 800,
-    marginBottom: 18,
+    marginBottom: 14,
+  },
+  heroTitleCompact: {
+    fontSize: 34,
+    marginBottom: 10,
   },
   heroLocation: {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    fontSize: 22,
+    fontSize: 18,
     color: "#4B5563",
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  heroLocationCompact: {
+    gap: 6,
+    fontSize: 14,
+    marginBottom: 6,
   },
   heroSecondary: {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    fontSize: 20,
+    fontSize: 16,
     color: "#6B7280",
+  },
+  heroSecondaryCompact: {
+    gap: 6,
+    fontSize: 13,
   },
   heroMeetingMeta: {
     display: "flex",
@@ -1077,21 +1142,27 @@ const styles: Record<string, React.CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    minHeight: 40,
+    minHeight: 34,
     padding: "0 14px",
     borderRadius: 999,
     background: "rgba(37,99,235,0.1)",
     color: "#2563EB",
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: 700,
+  },
+  heroMetaChipCompact: {
+    minHeight: 28,
+    padding: "0 10px",
+    fontSize: 12,
+    gap: 6,
   },
   peopleRow: {
     display: "flex",
     alignItems: "center",
   },
   personBadge: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
     borderRadius: "50%",
     marginLeft: -8,
     background: "linear-gradient(135deg, #E5E7EB, #F8FAFC)",
@@ -1099,13 +1170,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 700,
     color: "#374151",
   },
   personOverflow: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
     borderRadius: "50%",
     marginLeft: -8,
     background: "rgba(229,231,235,0.8)",
@@ -1113,9 +1184,15 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 700,
     color: "#4B5563",
+  },
+  personBadgeCompact: {
+    width: 32,
+    height: 32,
+    fontSize: 10,
+    borderWidth: 2,
   },
   flash: {
     marginBottom: 16,
@@ -1128,27 +1205,34 @@ const styles: Record<string, React.CSSProperties> = {
   },
   fullWidthPrimary: {
     width: "100%",
-    minHeight: 88,
+    minHeight: 64,
     border: "none",
-    borderRadius: 28,
+    borderRadius: 22,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
     color: "#FFFFFF",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 700,
     cursor: "pointer",
     boxShadow: "0 28px 60px rgba(37,99,235,0.24)",
-    marginBottom: 24,
+    marginBottom: 18,
+  },
+  fullWidthPrimaryCompact: {
+    minHeight: 54,
+    borderRadius: 18,
+    fontSize: 16,
+    gap: 8,
+    marginBottom: 14,
   },
   sectionCard: {
-    borderRadius: 34,
+    borderRadius: 26,
     background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.84))",
     border: "1px solid rgba(255,255,255,0.94)",
     boxShadow: "0 28px 80px rgba(31,41,55,0.08)",
-    padding: "28px 28px 24px",
-    marginBottom: 18,
+    padding: "20px 18px 18px",
+    marginBottom: 14,
   },
   sectionHeader: {
     display: "flex",
@@ -1158,7 +1242,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 16,
   },
   sectionHeading: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 700,
     color: "#6B7280",
     textTransform: "uppercase",
@@ -1168,20 +1252,20 @@ const styles: Record<string, React.CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    minHeight: 42,
-    padding: "0 16px",
-    borderRadius: 16,
+    minHeight: 36,
+    padding: "0 12px",
+    borderRadius: 14,
     border: "1px solid rgba(123,92,246,0.18)",
     background: "rgba(123,92,246,0.08)",
     color: "#6D28D9",
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: 700,
   },
   inlineTextButton: {
     border: "none",
     background: "transparent",
     color: "#6D28D9",
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
     padding: 0,
@@ -1189,72 +1273,79 @@ const styles: Record<string, React.CSSProperties> = {
   infoRow: {
     display: "flex",
     alignItems: "flex-start",
-    gap: 14,
-    padding: "18px 0",
+    gap: 12,
+    padding: "14px 0",
     borderTop: "1px solid rgba(229,231,235,0.6)",
   },
+  infoRowButton: {
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    textAlign: "left",
+    cursor: "pointer",
+  },
   infoRowIcon: {
-    width: 36,
+    width: 30,
     display: "flex",
     justifyContent: "center",
     color: "#6B7280",
     flexShrink: 0,
   },
   infoRowLabel: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: 700,
     color: "#6B7280",
     textTransform: "uppercase",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   infoRowTitle: {
-    fontSize: 28,
-    lineHeight: 1.04,
+    fontSize: 20,
+    lineHeight: 1.12,
     color: "#0F172A",
     fontWeight: 700,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   infoRowSubtitle: {
-    fontSize: 20,
+    fontSize: 15,
     color: "#6B7280",
     lineHeight: 1.35,
   },
   buttonRow: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 14,
-    marginTop: 18,
+    gap: 10,
+    marginTop: 14,
   },
   primaryButton: {
-    minHeight: 68,
+    minHeight: 54,
     border: "none",
-    borderRadius: 22,
+    borderRadius: 18,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
     color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 700,
     cursor: "pointer",
     boxShadow: "0 22px 46px rgba(91,61,245,0.22)",
   },
   secondaryButton: {
-    minHeight: 68,
+    minHeight: 54,
     border: "1px solid rgba(123,92,246,0.18)",
-    borderRadius: 22,
+    borderRadius: 18,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
     background: "rgba(255,255,255,0.9)",
     color: "#6D28D9",
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 700,
     cursor: "pointer",
   },
   bodyText: {
-    fontSize: 22,
+    fontSize: 16,
     lineHeight: 1.55,
     color: "#111827",
   },
@@ -1262,9 +1353,9 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 12,
-    marginTop: 22,
+    marginTop: 16,
     color: "#6B7280",
-    fontSize: 18,
+    fontSize: 14,
   },
   captureAvatar: {
     width: 34,
@@ -1282,7 +1373,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: 18,
-    padding: "16px 0",
+    padding: "14px 0",
     borderTop: "1px solid rgba(229,231,235,0.6)",
   },
   toggleRowText: {
@@ -1300,13 +1391,13 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   toggleTitle: {
-    fontSize: 22,
+    fontSize: 17,
     color: "#111827",
     fontWeight: 700,
     marginBottom: 4,
   },
   toggleSubtitle: {
-    fontSize: 18,
+    fontSize: 14,
     color: "#6B7280",
   },
   switchBase: {
@@ -1331,6 +1422,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 14,
   },
+  attachmentRowButton: {
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    textAlign: "left",
+    cursor: "pointer",
+    padding: 0,
+  },
   attachmentIcon: {
     width: 52,
     height: 52,
@@ -1341,13 +1440,13 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   attachmentTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 700,
     color: "#111827",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   attachmentSubtitle: {
-    fontSize: 18,
+    fontSize: 14,
     color: "#6B7280",
     wordBreak: "break-all",
   },
@@ -1360,7 +1459,7 @@ const styles: Record<string, React.CSSProperties> = {
     paddingLeft: 22,
     display: "grid",
     gap: 12,
-    fontSize: 22,
+    fontSize: 16,
     lineHeight: 1.4,
     color: "#111827",
   },
@@ -1384,27 +1483,27 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "18px 0",
   },
   metricLabel: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 700,
     color: "#6D28D9",
     marginTop: 10,
     marginBottom: 12,
   },
   metricTime: {
-    fontSize: 40,
+    fontSize: 30,
     lineHeight: 1,
     fontWeight: 800,
     color: "#111827",
     marginBottom: 10,
   },
   metricDate: {
-    fontSize: 18,
+    fontSize: 14,
     color: "#6B7280",
   },
   mapCard: {
     position: "relative",
-    height: 220,
-    borderRadius: 26,
+    height: 176,
+    borderRadius: 22,
     overflow: "hidden",
     marginTop: 16,
     background: "linear-gradient(180deg, #F8FAFC, #F3F4F6)",
@@ -1433,7 +1532,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: "48%",
     top: "58%",
     transform: "translateX(-50%)",
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: 700,
     color: "#6D28D9",
   },
@@ -1444,27 +1543,27 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     gap: 14,
     flexWrap: "wrap",
-    fontSize: 18,
+    fontSize: 14,
     color: "#6B7280",
   },
   ticketCard: {
     display: "flex",
-    gap: 20,
-    borderRadius: 28,
+    gap: 14,
+    borderRadius: 22,
     border: "1px solid rgba(123,92,246,0.16)",
     background: "linear-gradient(180deg, rgba(250,245,255,0.88), rgba(255,255,255,0.8))",
-    padding: 22,
+    padding: 16,
   },
   ticketTitle: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: 800,
     color: "#111827",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   ticketSubtitle: {
-    fontSize: 20,
+    fontSize: 14,
     color: "#6B7280",
-    marginBottom: 18,
+    marginBottom: 12,
   },
   ticketCounter: {
     display: "inline-flex",
@@ -1479,9 +1578,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
   },
   qrBox: {
-    width: 180,
+    width: 128,
     borderLeft: "1px dashed rgba(123,92,246,0.24)",
-    paddingLeft: 20,
+    paddingLeft: 14,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -1489,11 +1588,11 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   qrPattern: {
-    width: 104,
-    height: 104,
+    width: 80,
+    height: 80,
     backgroundImage: "linear-gradient(90deg, #111827 12%, transparent 12%, transparent 24%, #111827 24%, #111827 36%, transparent 36%, transparent 48%, #111827 48%, #111827 60%, transparent 60%, transparent 72%, #111827 72%), linear-gradient(#111827 12%, transparent 12%, transparent 24%, #111827 24%, #111827 36%, transparent 36%, transparent 48%, #111827 48%, #111827 60%, transparent 60%, transparent 72%, #111827 72%)",
-    backgroundSize: "20px 20px",
-    border: "8px solid rgba(255,255,255,0.9)",
+    backgroundSize: "16px 16px",
+    border: "6px solid rgba(255,255,255,0.9)",
     boxShadow: "inset 0 0 0 1px rgba(229,231,235,0.9)",
   },
   qrDigits: {
@@ -1508,36 +1607,36 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 18,
   },
   summaryTile: {
-    borderRadius: 30,
+    borderRadius: 22,
     background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.84))",
     border: "1px solid rgba(255,255,255,0.94)",
     boxShadow: "0 24px 70px rgba(31,41,55,0.08)",
-    padding: "20px 18px",
+    padding: "16px 12px",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     textAlign: "center",
   },
   summaryRing: {
-    width: 68,
-    height: 68,
+    width: 56,
+    height: 56,
     borderRadius: "50%",
     border: "4px solid rgba(34,197,94,0.25)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 800,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   summaryValue: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 800,
     color: "#111827",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   summarySubtitle: {
-    fontSize: 16,
+    fontSize: 12,
     color: "#6B7280",
     lineHeight: 1.4,
   },
@@ -1560,7 +1659,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   checkLabel: {
-    fontSize: 24,
+    fontSize: 17,
     color: "#111827",
     fontWeight: 600,
   },
@@ -1573,38 +1672,38 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "center",
   },
   shareAvatar: {
-    width: 68,
-    height: 68,
+    width: 52,
+    height: 52,
     borderRadius: "50%",
-    margin: "0 auto 12px",
+    margin: "0 auto 10px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     background: "linear-gradient(135deg, #E5E7EB, #F8FAFC)",
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 700,
     color: "#374151",
   },
   shareName: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: 700,
     color: "#111827",
     marginBottom: 4,
   },
   shareRole: {
-    fontSize: 17,
+    fontSize: 13,
     color: "#6B7280",
   },
   tipCard: {
     display: "flex",
     alignItems: "center",
     gap: 14,
-    padding: "22px 24px",
-    borderRadius: 28,
+    padding: "16px 14px",
+    borderRadius: 22,
     background: "linear-gradient(135deg, rgba(255,247,237,0.9), rgba(255,255,255,0.78))",
     border: "1px solid rgba(253,186,116,0.28)",
     boxShadow: "0 22px 60px rgba(249,115,22,0.08)",
-    marginBottom: 18,
+    marginBottom: 14,
   },
   tipSpark: {
     width: 44,
@@ -1618,19 +1717,19 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   tipText: {
-    fontSize: 20,
+    fontSize: 15,
     lineHeight: 1.5,
     color: "#111827",
   },
   actionStrip: {
     display: "grid",
     gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-    gap: 14,
-    borderRadius: 32,
+    gap: 10,
+    borderRadius: 24,
     background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.88))",
     border: "1px solid rgba(255,255,255,0.92)",
     boxShadow: "0 26px 80px rgba(31,41,55,0.08)",
-    padding: "18px 16px",
+    padding: "14px 10px",
   },
   actionStripButton: {
     border: "none",
@@ -1638,13 +1737,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: 10,
-    fontSize: 17,
+    gap: 8,
+    fontSize: 13,
     fontWeight: 600,
   },
   actionStripIcon: {
-    width: 54,
-    height: 54,
+    width: 44,
+    height: 44,
     borderRadius: "50%",
     display: "flex",
     alignItems: "center",

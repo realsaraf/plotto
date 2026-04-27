@@ -26,10 +26,10 @@ interface BottomTabItem {
 
 export function AppBrand() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icon.png" alt="Toatre" style={{ width: 42, height: 42, borderRadius: 14, objectFit: "cover" }} />
-      <ToatreMark width={122} />
+      <img src="/icon.png" alt="Toatre" style={{ width: "clamp(32px, 9vw, 40px)", height: "clamp(32px, 9vw, 40px)", borderRadius: "clamp(12px, 3.4vw, 14px)", objectFit: "cover" }} />
+      <ToatreMark width={100} />
     </div>
   );
 }
@@ -42,9 +42,9 @@ export function CircleIconButton({ label, onClick, active = false, children }: C
       aria-label={label}
       title={label}
       style={{
-        width: 60,
-        height: 60,
-        borderRadius: 22,
+        width: "clamp(52px, 14vw, 60px)",
+        height: "clamp(52px, 14vw, 60px)",
+        borderRadius: "clamp(18px, 5vw, 22px)",
         border: active ? "1px solid rgba(99,102,241,0.22)" : "1px solid rgba(255,255,255,0.82)",
         background: active
           ? "linear-gradient(180deg, rgba(237,233,254,0.98), rgba(255,255,255,0.9))"
@@ -76,7 +76,7 @@ export function UserAvatar({ user }: { user: AvatarUser | null | undefined }) {
     : user?.email?.[0]?.toUpperCase() ?? "T";
 
   return (
-    <div style={{ position: "relative", width: 62, height: 62, flexShrink: 0 }}>
+    <div style={{ position: "relative", width: "clamp(46px, 12vw, 58px)", height: "clamp(46px, 12vw, 58px)", flexShrink: 0 }}>
       {user?.photoURL ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
@@ -86,7 +86,7 @@ export function UserAvatar({ user }: { user: AvatarUser | null | undefined }) {
           style={{
             width: "100%",
             height: "100%",
-            borderRadius: 22,
+            borderRadius: "clamp(18px, 5vw, 22px)",
             objectFit: "cover",
             boxShadow: "0 18px 40px rgba(31,41,55,0.12)",
             border: "1px solid rgba(255,255,255,0.85)",
@@ -97,13 +97,13 @@ export function UserAvatar({ user }: { user: AvatarUser | null | undefined }) {
           style={{
             width: "100%",
             height: "100%",
-            borderRadius: 22,
+            borderRadius: "clamp(18px, 5vw, 22px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             background: "linear-gradient(135deg, #7C3AED, #EC4899)",
             color: "#FFFFFF",
-            fontSize: 20,
+            fontSize: 16,
             fontWeight: 700,
             boxShadow: "0 18px 40px rgba(124,58,237,0.2)",
           }}
@@ -117,8 +117,8 @@ export function UserAvatar({ user }: { user: AvatarUser | null | undefined }) {
           position: "absolute",
           right: -2,
           bottom: -2,
-          width: 16,
-          height: 16,
+          width: 12,
+          height: 12,
           borderRadius: "50%",
           border: "3px solid rgba(255,255,255,0.95)",
           background: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
@@ -137,10 +137,10 @@ export function FloatingMicButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       style={{
         position: "fixed",
-        right: "max(22px, calc((100vw - min(100vw - 24px, 860px)) / 2 + 24px))",
-        bottom: 118,
-        width: 108,
-        height: 108,
+        right: "max(16px, calc((100vw - min(100vw - 16px, 860px)) / 2 + 16px))",
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 78px)",
+        width: "clamp(72px, 19vw, 84px)",
+        height: "clamp(72px, 19vw, 84px)",
         borderRadius: "50%",
         border: "none",
         background: "radial-gradient(circle at 30% 20%, #FDE68A 0%, rgba(253,230,138,0.56) 20%, rgba(253,230,138,0) 42%), linear-gradient(135deg, #5B3DF5 0%, #7C3AED 38%, #EC4899 72%, #FB923C 100%)",
@@ -155,13 +155,13 @@ export function FloatingMicButton({ onClick }: { onClick: () => void }) {
       <div
         style={{
           position: "absolute",
-          inset: 12,
+          inset: 8,
           borderRadius: "50%",
           border: "1px solid rgba(255,255,255,0.36)",
           background: "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.02))",
         }}
       />
-      <MicIcon size={42} color="#FFFFFF" />
+      <MicIcon size={30} color="#FFFFFF" />
     </button>
   );
 }
@@ -173,18 +173,18 @@ export function BottomTabBar({ items }: { items: BottomTabItem[] }) {
       style={{
         position: "fixed",
         left: "50%",
-        bottom: 22,
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)",
         transform: "translateX(-50%)",
-        width: "min(calc(100vw - 24px), 860px)",
-        padding: "10px 14px 12px",
-        borderRadius: 28,
+        width: "min(calc(100vw - 16px), 860px)",
+        padding: "7px 8px calc(env(safe-area-inset-bottom, 0px) + 6px)",
+        borderRadius: 22,
         background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.88))",
         border: "1px solid rgba(255,255,255,0.88)",
         boxShadow: "0 24px 70px rgba(31,41,55,0.12)",
         backdropFilter: "blur(18px)",
         display: "grid",
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
-        gap: 6,
+        gap: 4,
         zIndex: 40,
       }}
     >
@@ -194,9 +194,9 @@ export function BottomTabBar({ items }: { items: BottomTabItem[] }) {
             <span
               style={{
                 position: "relative",
-                width: 40,
-                height: 40,
-                borderRadius: 16,
+                width: 34,
+                height: 34,
+                borderRadius: 13,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -231,7 +231,7 @@ export function BottomTabBar({ items }: { items: BottomTabItem[] }) {
             </span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 10.5,
                 fontWeight: item.active ? 700 : 500,
                 color: item.active ? "#5B3DF5" : "#6B7280",
               }}
@@ -256,10 +256,10 @@ export function BottomTabBar({ items }: { items: BottomTabItem[] }) {
           flexDirection: "column" as const,
           alignItems: "center",
           justifyContent: "center",
-          gap: 4,
-          minHeight: 72,
+          gap: 2,
+          minHeight: 58,
           textDecoration: "none",
-          borderRadius: 20,
+          borderRadius: 16,
           border: "none",
           background: "transparent",
           cursor: item.href || item.onClick ? "pointer" : "default",

@@ -39,6 +39,15 @@
 - Traced the crash to `AnalyserNode.fftSize = 80`, which throws `IndexSizeError` because Web Audio requires a power-of-two FFT size
 - Updated the capture page to use a valid analyser FFT size, keep startup errors accurate, and verified `/capture` records, uploads to `/api/captures`, and reaches the review state
 
+### Session 2026-04-26 (web settings + typed capture + observability) — completed
+- Added a real web settings surface with General, Phone, Handle, and Pings tabs, plus a visible sign-out path from the profile area
+- Added typed capture mode and timeline entry points so captures can start from text as well as voice
+- Tightened the mobile web timeline and toat-detail views for phone-sized layouts, including denser cards and larger actionable tap targets
+- Added Langfuse instrumentation around server-side Whisper transcription and extraction, then verified a fresh live trace end to end
+- Fixed Twilio Verify route failures caused by Mongo upsert path conflicts in the settings document flow, then completed a live localhost send/check round-trip successfully
+- Restored temporary verification state after testing so the local account and Twilio service returned to their original baseline
+- Validation: `npm run typecheck`, `npm run build`, Playwright localhost settings/timeline/detail checks, live Langfuse trace verification, and live Twilio verify round-trip
+
 ### Session 2026-04-25 (CI unblocking) — completed
 - Created iOS Distribution cert `SJ5FF9432Y` (iPhone Distribution: Saraf Talukder, expires 2027-04-25)
 - Generated private key + P12 (`ios_distribution.p12`, password: `toatre2026`)

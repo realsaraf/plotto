@@ -15,6 +15,7 @@ import {
   ClockIcon,
   DirectionsIcon,
   EnvelopeGlyph,
+  EditIcon,
   FilterIcon,
   FloatingMicButton,
   InboxIcon,
@@ -334,7 +335,7 @@ function getUpNext(toats: TimelineToat[], now: Date) {
     });
 }
 
-function EmptyTimeline({ onCapture }: { onCapture: () => void }) {
+function EmptyTimeline({ onCapture, onTextCapture }: { onCapture: () => void; onTextCapture: () => void }) {
   return (
     <section style={styles.emptyCard}>
       <div style={styles.emptySun} />
@@ -345,7 +346,10 @@ function EmptyTimeline({ onCapture }: { onCapture: () => void }) {
         </div>
         <h2 style={styles.emptyTitle}>You&apos;re all clear.</h2>
         <p style={styles.emptyBody}>Tap the mic and say what needs to happen next. Toatre will turn it into toats and drop them into your timeline.</p>
-        <button type="button" onClick={onCapture} style={styles.emptyCaptureButton}>Start capturing</button>
+        <div style={styles.emptyActions}>
+          <button type="button" onClick={onCapture} style={styles.emptyCaptureButton}>Start capturing</button>
+          <button type="button" onClick={onTextCapture} style={styles.emptyTextButton}>Type it instead</button>
+        </div>
       </div>
       <div style={styles.landscape}>
         <div style={styles.sunDisc} />
@@ -364,9 +368,11 @@ export default function TimelinePage() {
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [showOnlyTimed, setShowOnlyTimed] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
 
   const now = new Date();
   const openCapture = () => router.push("/capture?autostart=1");
+  const openTextCapture = () => router.push("/capture?mode=text");
 
   useEffect(() => {
     if (!user) {
@@ -404,6 +410,19 @@ export default function TimelinePage() {
     };
   }, [user]);
 
+  useEffect(() => {
+    const updateViewportWidth = () => {
+      setViewportWidth(window.innerWidth);
+    };
+
+    updateViewportWidth();
+    window.addEventListener("resize", updateViewportWidth);
+
+    return () => {
+      window.removeEventListener("resize", updateViewportWidth);
+    };
+  }, []);
+
   const groups = buildDayGroups(toats, now);
   const resolvedSelectedDayKey = selectedDayKey && groups.some((group) => group.key === selectedDayKey)
     ? selectedDayKey
@@ -414,6 +433,8 @@ export default function TimelinePage() {
   const upNext = getUpNext(toats, new Date());
   const lastToat = visibleToats[visibleToats.length - 1] ?? null;
   const loading = authLoading || (Boolean(user) && !hasLoadedData);
+  const isPhoneViewport = viewportWidth !== null && viewportWidth <= 430;
+  const clearCardMarginTop = visibleToats.length <= 2 ? (isPhoneViewport ? 34 : 18) : 8;
 
   return (
     <div style={styles.page}>
@@ -421,106 +442,111 @@ export default function TimelinePage() {
       <div style={styles.backgroundHaloTwo} />
       <div style={styles.backgroundHaloThree} />
 
-      <main style={styles.main}>
-        <section style={styles.topRow}>
-          <AppBrand />
-          <UserAvatar user={user} />
+      <main style={{ ...styles.main, ...(isPhoneViewport ? styles.mainCompact : {}) }}>
+        <section style={{ ...styles.topRow, ...(isPhoneViewport ? styles.topRowCompact : {}) }}>
+            <AppBrand />
+            <button type="button" onClick={() => router.push("/settings")} style={styles.avatarButton} aria-label="Open profile settings">
+              <UserAvatar user={user} />
+            </button>
         </section>
 
-        <section style={styles.headingRow}>
-          <div style={{ position: "relative", flex: 1 }}>
-            <button type="button" onClick={() => setPickerOpen((value) => !value)} style={styles.dayButton}>
-              <span style={styles.dayButtonLabel}>{activeGroup?.title ?? "Timeline"}</span>
-              <ChevronDownIcon size={22} />
-            </button>
-            <p style={styles.dayButtonSubtitle}>{activeGroup?.subtitle ?? "Your next toats"}</p>
+        <section style={{ ...styles.headingRow, ...(isPhoneViewport ? styles.headingRowCompact : {}) }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <button type="button" onClick={() => setPickerOpen((value) => !value)} style={{ ...styles.dayButton, ...(isPhoneViewport ? styles.dayButtonCompact : {}) }}>
+                <span style={styles.dayButtonLabel}>{activeGroup?.title ?? "Timeline"}</span>
+                <ChevronDownIcon size={22} />
+              </button>
+              <p style={{ ...styles.dayButtonSubtitle, ...(isPhoneViewport ? styles.dayButtonSubtitleCompact : {}) }}>{activeGroup?.subtitle ?? "Your next toats"}</p>
 
-            {pickerOpen ? (
-              <div style={styles.dayPicker}>
-                {groups.map((group) => (
-                  <button
-                    key={group.key}
-                    type="button"
-                    onClick={() => {
-                      setSelectedDayKey(group.key);
-                      setPickerOpen(false);
-                    }}
-                    style={{
-                      ...styles.dayPickerItem,
-                      background: group.key === activeGroup?.key ? "rgba(91,61,245,0.10)" : "transparent",
-                    }}
-                  >
-                    <span>
-                      <span style={styles.dayPickerTitle}>{group.title}</span>
-                      <span style={styles.dayPickerSubtitle}>{group.subtitle}</span>
-                    </span>
-                    <span style={styles.dayPickerCount}>{group.toats.length}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
+              {pickerOpen ? (
+                <div style={{ ...styles.dayPicker, ...(isPhoneViewport ? styles.dayPickerCompact : {}) }}>
+                  {groups.map((group) => (
+                    <button
+                      key={group.key}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDayKey(group.key);
+                        setPickerOpen(false);
+                      }}
+                      style={{
+                        ...styles.dayPickerItem,
+                        background: group.key === activeGroup?.key ? "rgba(91,61,245,0.10)" : "transparent",
+                      }}
+                    >
+                      <span>
+                        <span style={styles.dayPickerTitle}>{group.title}</span>
+                        <span style={styles.dayPickerSubtitle}>{group.subtitle}</span>
+                      </span>
+                      <span style={styles.dayPickerCount}>{group.toats.length}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
-          <div style={styles.headerActions}>
-            <CircleIconButton label="Choose day" onClick={() => setPickerOpen((value) => !value)}>
-              <CalendarIcon size={26} />
-            </CircleIconButton>
-            <CircleIconButton
-              label="Filter timed toats"
-              active={showOnlyTimed}
-              onClick={() => setShowOnlyTimed((value) => !value)}
-            >
-              <FilterIcon size={26} />
-            </CircleIconButton>
-          </div>
+            <div style={{ ...styles.headerActions, ...(isPhoneViewport ? styles.headerActionsCompact : {}) }}>
+              <CircleIconButton label="Choose day" onClick={() => setPickerOpen((value) => !value)}>
+                <CalendarIcon size={26} />
+              </CircleIconButton>
+              <CircleIconButton
+                label="Filter timed toats"
+                active={showOnlyTimed}
+                onClick={() => setShowOnlyTimed((value) => !value)}
+              >
+                <FilterIcon size={26} />
+              </CircleIconButton>
+            </div>
         </section>
 
         {loading ? (
-          <section style={styles.loadingCard}>
+          <section style={{ ...styles.loadingCard, ...(isPhoneViewport ? styles.loadingCardCompact : {}) }}>
             <div style={styles.loadingSpinner} className="animate-spin" />
             <p style={styles.loadingText}>Loading your timeline…</p>
           </section>
         ) : null}
 
-        {!loading && upNext ? <UpNextCard toat={upNext} /> : null}
+        {!loading && upNext ? <UpNextCard toat={upNext} compact={isPhoneViewport} /> : null}
 
         {!loading && visibleToats.length > 0 ? (
-          <section>
-            {sections.map((section) => (
-              <div key={section.label} style={styles.sectionBlock}>
-                <h2 style={styles.sectionTitle}>{section.label}</h2>
-                <div style={styles.sectionRows}>
-                  {section.toats.map((toat) => (
-                    <TimelineRow key={toat.id} toat={toat} onOpen={() => router.push(`/toats/${toat.id}`)} />
-                  ))}
+            <section>
+              {sections.map((section) => (
+                <div key={section.label} style={styles.sectionBlock}>
+                  <h2 style={{ ...styles.sectionTitle, ...(isPhoneViewport ? styles.sectionTitleCompact : {}) }}>{section.label}</h2>
+                  <div style={{ ...styles.sectionRows, ...(isPhoneViewport ? styles.sectionRowsCompact : {}) }}>
+                    {section.toats.map((toat) => (
+                      <TimelineRow key={toat.id} toat={toat} onOpen={() => router.push(`/toats/${toat.id}`)} compact={isPhoneViewport} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            <section style={styles.clearCard}>
-              <div style={styles.clearTextWrap}>
-                <span style={styles.clearSparkle}><SparkleIcon size={18} /></span>
-                <div>
-                  <p style={styles.clearHeadline}>
-                    {lastToat?.datetime ? `You’re all clear after ${formatTime(new Date(lastToat.datetime))}` : "You’re all clear."}
-                  </p>
-                  <p style={styles.clearSub}>Enjoy your {lastToat?.datetime && new Date(lastToat.datetime).getHours() < 17 ? "evening" : "day"}.</p>
+              <section style={{ ...styles.clearCard, ...(isPhoneViewport ? styles.clearCardCompact : {}), marginTop: clearCardMarginTop }}>
+                <div style={styles.clearTextWrap}>
+                  <span style={{ ...styles.clearSparkle, ...(isPhoneViewport ? styles.clearSparkleCompact : {}) }}><SparkleIcon size={isPhoneViewport ? 14 : 18} /></span>
+                  <div>
+                    <p style={{ ...styles.clearHeadline, ...(isPhoneViewport ? styles.clearHeadlineCompact : {}) }}>
+                      {lastToat?.datetime ? `You’re all clear after ${formatTime(new Date(lastToat.datetime))}` : "You’re all clear."}
+                    </p>
+                    <p style={{ ...styles.clearSub, ...(isPhoneViewport ? styles.clearSubCompact : {}) }}>Enjoy your {lastToat?.datetime && new Date(lastToat.datetime).getHours() < 17 ? "evening" : "day"}.</p>
+                  </div>
                 </div>
-              </div>
-              <div style={styles.clearScene}>
-                <div style={styles.clearSceneSun} />
-                <div style={styles.clearSceneHillOne} />
-                <div style={styles.clearSceneHillTwo} />
-              </div>
+                <div style={{ ...styles.clearScene, ...(isPhoneViewport ? styles.clearSceneCompact : {}) }}>
+                  <div style={{ ...styles.clearSceneSun, ...(isPhoneViewport ? styles.clearSceneSunCompact : {}) }} />
+                  <div style={{ ...styles.clearSceneHillOne, ...(isPhoneViewport ? styles.clearSceneHillOneCompact : {}) }} />
+                  <div style={{ ...styles.clearSceneHillTwo, ...(isPhoneViewport ? styles.clearSceneHillTwoCompact : {}) }} />
+                </div>
+              </section>
             </section>
-          </section>
-        ) : null}
+          ) : null}
 
-        {!loading && !toats.length ? <EmptyTimeline onCapture={openCapture} /> : null}
+        {!loading && !toats.length ? <EmptyTimeline onCapture={openCapture} onTextCapture={openTextCapture} /> : null}
 
-        <div style={{ height: 220 }} />
+        <div style={{ height: isPhoneViewport ? 128 : 176 }} />
       </main>
 
+      <button type="button" onClick={openTextCapture} style={styles.textCaptureDockButton} aria-label="Start text capture" title="Start text capture">
+        <EditIcon size={18} />
+      </button>
       <FloatingMicButton onClick={openCapture} />
 
       <BottomTabBar
@@ -529,14 +555,14 @@ export default function TimelinePage() {
           { label: "Search", icon: <SearchIcon /> },
           { label: "People", icon: <PeopleIcon /> },
           { label: "Inbox", icon: <InboxIcon /> },
-          { label: "Settings", icon: <SettingsIcon /> },
+          { label: "Settings", icon: <SettingsIcon />, href: "/settings" },
         ]}
       />
     </div>
   );
 }
 
-function UpNextCard({ toat }: { toat: TimelineToat }) {
+function UpNextCard({ toat, compact = false }: { toat: TimelineToat; compact?: boolean }) {
   const router = useRouter();
   const visual = getToatVisual(toat);
   const Icon = visual.Icon;
@@ -553,34 +579,36 @@ function UpNextCard({ toat }: { toat: TimelineToat }) {
   };
 
   return (
-    <section style={styles.upNextCard} className="animate-fade-up">
-      <div style={styles.upNextMetaRow}>
-        <span style={styles.upNextBadge}><SparkleIcon size={16} /> UP NEXT</span>
-        <span style={styles.upNextTimePill}><ClockIcon size={18} /> {time}</span>
+    <section style={{ ...styles.upNextCard, ...(compact ? styles.upNextCardCompact : {}) }} className="animate-fade-up">
+      <div style={{ ...styles.upNextMetaRow, ...(compact ? styles.upNextMetaRowCompact : {}) }}>
+        <span style={{ ...styles.upNextBadge, ...(compact ? styles.upNextBadgeCompact : {}) }}><SparkleIcon size={compact ? 12 : 16} /> UP NEXT</span>
+        <span style={{ ...styles.upNextTimePill, ...(compact ? styles.upNextTimePillCompact : {}) }}><ClockIcon size={compact ? 14 : 18} /> {time}</span>
       </div>
 
-      <div style={styles.upNextBody}>
-        <div style={{ ...styles.iconPanel, background: visual.cardGradient }}>
-          <Icon size={34} />
+      <div style={{ ...styles.upNextBody, ...(compact ? styles.upNextBodyCompact : {}) }}>
+        <div style={{ ...styles.iconPanel, ...(compact ? styles.iconPanelCompact : {}), background: visual.cardGradient }}>
+          <Icon size={compact ? 24 : 30} />
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={styles.upNextTitle}>{toat.title}</h3>
+          <h3 style={{ ...styles.upNextTitle, ...(compact ? styles.upNextTitleCompact : {}) }}>{toat.title}</h3>
           {toat.location ? (
-            <p style={styles.upNextLocation}><LocationIcon size={18} /> {toat.location}</p>
+            <p style={{ ...styles.upNextLocation, ...(compact ? styles.upNextLocationCompact : {}) }}><LocationIcon size={compact ? 14 : 18} /> {toat.location}</p>
           ) : null}
-          <p style={{ ...styles.upNextCountdown, color: visual.actionColor }}>{getCountdownLabel(toat, new Date())}</p>
+          <p style={{ ...styles.upNextCountdown, ...(compact ? styles.upNextCountdownCompact : {}), color: visual.actionColor }}>{getCountdownLabel(toat, new Date())}</p>
         </div>
+      </div>
 
-        <button type="button" onClick={openAction} style={{ ...styles.primaryPillButton, background: visual.cardGradient }}>
-          <DirectionsIcon size={18} /> {action.label === "Open" ? "View details" : action.label}
+      <div style={styles.upNextActionRow}>
+        <button type="button" onClick={openAction} style={{ ...styles.primaryPillButton, ...(compact ? styles.primaryPillButtonCompact : {}), background: visual.cardGradient }}>
+          <DirectionsIcon size={compact ? 14 : 18} /> {action.label === "Open" ? "View details" : action.label}
         </button>
       </div>
     </section>
   );
 }
 
-function TimelineRow({ toat, onOpen }: { toat: TimelineToat; onOpen: () => void }) {
+function TimelineRow({ toat, onOpen, compact = false }: { toat: TimelineToat; onOpen: () => void; compact?: boolean }) {
   const visual = getToatVisual(toat);
   const Icon = visual.Icon;
   const action = getPrimaryAction(toat);
@@ -606,41 +634,41 @@ function TimelineRow({ toat, onOpen }: { toat: TimelineToat; onOpen: () => void 
   const railTime = toat.datetime ? formatRailTime(new Date(toat.datetime)) : { time: "Any", period: "time" };
 
   return (
-    <div style={styles.timelineRow}>
-      <div style={styles.timeRailColumn}>
-        <p style={styles.timeRailTime}>{railTime.time}</p>
-        <p style={styles.timeRailPeriod}>{railTime.period}</p>
+    <div style={{ ...styles.timelineRow, ...(compact ? styles.timelineRowCompact : {}) }}>
+      <div style={{ ...styles.timeRailColumn, ...(compact ? styles.timeRailColumnCompact : {}) }}>
+        <p style={{ ...styles.timeRailTime, ...(compact ? styles.timeRailTimeCompact : {}) }}>{railTime.time}</p>
+        <p style={{ ...styles.timeRailPeriod, ...(compact ? styles.timeRailPeriodCompact : {}) }}>{railTime.period}</p>
       </div>
 
       <div style={styles.railTrackWrap}>
         <div style={styles.railLine} />
-        <span style={{ ...styles.railDot, background: visual.iconTint }} />
+        <span style={{ ...styles.railDot, ...(compact ? styles.railDotCompact : {}), background: visual.iconTint }} />
       </div>
 
-      <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={onKeyDown} style={styles.toatCard}>
-        <div style={{ ...styles.iconPanel, width: 92, height: 92, borderRadius: 28, background: visual.cardGradient, boxShadow: `0 26px 44px ${visual.softTint}` }}>
-          <Icon size={36} />
+      <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={onKeyDown} style={{ ...styles.toatCard, ...(compact ? styles.toatCardCompact : {}) }}>
+        <div style={{ ...styles.iconPanel, ...(compact ? styles.timelineIconPanelCompact : styles.timelineIconPanel), background: visual.cardGradient, boxShadow: `0 18px 32px ${visual.softTint}` }}>
+          <Icon size={compact ? 24 : 30} />
         </div>
 
-        <div style={styles.cardBody}>
-          <div style={styles.cardHeader}>
+        <div style={{ ...styles.cardBody, ...(compact ? styles.cardBodyCompact : {}) }}>
+          <div style={{ ...styles.cardHeader, ...(compact ? styles.cardHeaderCompact : {}) }}>
             <div style={{ minWidth: 0 }}>
-              <p style={styles.cardTitle}>{toat.title}</p>
+              <p style={{ ...styles.cardTitle, ...(compact ? styles.cardTitleCompact : {}) }}>{toat.title}</p>
               {toat.location ? (
-                <p style={styles.cardMeta}><LocationIcon size={18} /> {toat.location}</p>
+                <p style={{ ...styles.cardMeta, ...(compact ? styles.cardMetaCompact : {}) }}><LocationIcon size={compact ? 14 : 18} /> {toat.location}</p>
               ) : toat.people.length ? (
-                <p style={styles.cardMeta}><PeopleIcon size={18} /> {toat.people.join(", ")}</p>
+                <p style={{ ...styles.cardMeta, ...(compact ? styles.cardMetaCompact : {}) }}><PeopleIcon size={compact ? 14 : 18} /> {toat.people.join(", ")}</p>
               ) : (
-                <p style={styles.cardMeta}>{getCountdownLabel(toat, new Date())}</p>
+                <p style={{ ...styles.cardMeta, ...(compact ? styles.cardMetaCompact : {}) }}>{getCountdownLabel(toat, new Date())}</p>
               )}
             </div>
             <span style={{ color: "#9CA3AF", flexShrink: 0 }}><ChevronRightIcon /></span>
           </div>
 
-          <div style={styles.cardFooter}>
-            <span style={{ ...styles.kindPill, color: visual.actionColor, background: visual.softTint }}>{visual.label}</span>
-            <button type="button" onClick={runAction} style={{ ...styles.cardActionButton, color: visual.actionColor, background: visual.actionBackground }}>
-              <DirectionsIcon size={18} /> {action.label}
+          <div style={{ ...styles.cardFooter, ...(compact ? styles.cardFooterCompact : {}) }}>
+            <span style={{ ...styles.kindPill, ...(compact ? styles.kindPillCompact : {}), color: visual.actionColor, background: visual.softTint }}>{visual.label}</span>
+            <button type="button" onClick={runAction} style={{ ...styles.cardActionButton, ...(compact ? styles.cardActionButtonCompact : {}), color: visual.actionColor, background: visual.actionBackground }}>
+              <DirectionsIcon size={compact ? 14 : 18} /> {action.label}
             </button>
           </div>
         </div>
@@ -684,26 +712,43 @@ const styles: Record<string, React.CSSProperties> = {
     filter: "blur(24px)",
   },
   main: {
-    width: "min(calc(100vw - 24px), 860px)",
+    width: "min(calc(100vw - 16px), 860px)",
     margin: "0 auto",
-    padding: "24px 0 0",
+    padding: "16px 0 0",
     position: "relative",
     zIndex: 1,
+  },
+  mainCompact: {
+    width: "min(calc(100vw - 18px), 860px)",
+    padding: "14px 0 0",
   },
   topRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 16,
-    marginBottom: 34,
+    gap: 12,
+    marginBottom: "clamp(20px, 6vw, 34px)",
+  },
+  topRowCompact: {
+    marginBottom: 16,
+  },
+  avatarButton: {
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    cursor: "pointer",
   },
   headingRow: {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 18,
-    marginBottom: 28,
+    gap: "clamp(12px, 4vw, 18px)",
+    marginBottom: "clamp(20px, 5vw, 28px)",
     position: "relative",
+  },
+  headingRowCompact: {
+    gap: 10,
+    marginBottom: 18,
   },
   dayButton: {
     display: "inline-flex",
@@ -712,34 +757,46 @@ const styles: Record<string, React.CSSProperties> = {
     background: "transparent",
     border: "none",
     padding: 0,
-    fontSize: 66,
+    fontSize: "clamp(38px, 10.8vw, 56px)",
     lineHeight: 0.96,
     fontWeight: 800,
     color: "#0F1B4C",
     cursor: "pointer",
     letterSpacing: "-0.05em",
   },
+  dayButtonCompact: {
+    fontSize: 34,
+    gap: 8,
+  },
   dayButtonLabel: {
     transform: "translateY(2px)",
   },
   dayButtonSubtitle: {
     marginTop: 10,
-    fontSize: 24,
+    fontSize: "clamp(14px, 4.2vw, 20px)",
     color: "#6B7280",
     fontWeight: 500,
   },
+  dayButtonSubtitleCompact: {
+    marginTop: 6,
+    fontSize: 11,
+  },
   dayPicker: {
     position: "absolute",
-    top: 112,
+    top: "clamp(84px, 22vw, 112px)",
     left: 0,
-    width: 300,
+    width: "min(100%, 300px)",
     padding: 10,
-    borderRadius: 24,
+    borderRadius: 22,
     border: "1px solid rgba(255,255,255,0.92)",
     background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.86))",
     boxShadow: "0 28px 70px rgba(31,41,55,0.13)",
     backdropFilter: "blur(18px)",
     zIndex: 10,
+  },
+  dayPickerCompact: {
+    top: 72,
+    width: 250,
   },
   dayPickerItem: {
     width: "100%",
@@ -755,7 +812,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dayPickerTitle: {
     display: "block",
-    fontSize: 18,
+    fontSize: "clamp(16px, 4.4vw, 18px)",
     fontWeight: 700,
     color: "#111827",
     marginBottom: 4,
@@ -779,13 +836,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   headerActions: {
     display: "flex",
-    gap: 14,
+    gap: 10,
     flexShrink: 0,
-    paddingTop: 8,
+    paddingTop: 4,
+  },
+  headerActionsCompact: {
+    gap: 8,
+    paddingTop: 2,
   },
   loadingCard: {
-    minHeight: 220,
-    borderRadius: 34,
+    minHeight: 180,
+    borderRadius: 24,
     background: "linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.76))",
     border: "1px solid rgba(255,255,255,0.9)",
     boxShadow: "0 28px 80px rgba(31,41,55,0.08)",
@@ -793,8 +854,13 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: 18,
-    marginBottom: 28,
+    gap: 14,
+    marginBottom: 22,
+  },
+  loadingCardCompact: {
+    minHeight: 140,
+    borderRadius: 20,
+    marginBottom: 18,
   },
   loadingSpinner: {
     width: 34,
@@ -804,136 +870,212 @@ const styles: Record<string, React.CSSProperties> = {
     borderTopColor: "#5B3DF5",
   },
   loadingText: {
-    fontSize: 17,
+    fontSize: 15,
     color: "#6B7280",
     fontWeight: 500,
   },
   upNextCard: {
-    borderRadius: 36,
-    padding: "24px 28px 30px",
-    marginBottom: 24,
+    borderRadius: "clamp(24px, 7vw, 32px)",
+    padding: "clamp(16px, 4.4vw, 20px) clamp(16px, 5vw, 22px) clamp(18px, 5.4vw, 24px)",
+    marginBottom: 18,
     background: "linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,247,255,0.84))",
     border: "1px solid rgba(248,212,255,0.72)",
     boxShadow: "0 32px 90px rgba(31,41,55,0.08)",
     backdropFilter: "blur(20px)",
   },
+  upNextCardCompact: {
+    borderRadius: 20,
+    padding: "11px 12px 12px",
+    marginBottom: 12,
+  },
   upNextMetaRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 16,
-    marginBottom: 14,
+    gap: 12,
+    marginBottom: 12,
     flexWrap: "wrap",
+  },
+  upNextMetaRowCompact: {
+    gap: 8,
+    marginBottom: 8,
   },
   upNextBadge: {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    padding: "10px 16px",
+    padding: "7px 12px",
     borderRadius: 999,
     background: "rgba(91,61,245,0.08)",
     color: "#5B3DF5",
-    fontSize: 17,
+    fontSize: "clamp(13px, 3.6vw, 15px)",
     fontWeight: 700,
+  },
+  upNextBadgeCompact: {
+    padding: "6px 10px",
+    fontSize: 11,
+    gap: 6,
   },
   upNextTimePill: {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    padding: "10px 16px",
-    borderRadius: 18,
+    padding: "7px 12px",
+    borderRadius: 14,
     background: "rgba(255,255,255,0.86)",
     color: "#374151",
-    fontSize: 17,
+    fontSize: "clamp(13px, 3.6vw, 15px)",
     fontWeight: 600,
+  },
+  upNextTimePillCompact: {
+    padding: "6px 10px",
+    borderRadius: 12,
+    fontSize: 11,
+    gap: 6,
   },
   upNextBody: {
     display: "flex",
     alignItems: "center",
-    gap: 20,
-    flexWrap: "wrap",
+    gap: "clamp(14px, 4vw, 20px)",
+    marginBottom: 14,
+  },
+  upNextBodyCompact: {
+    gap: 8,
+    marginBottom: 8,
+  },
+  upNextActionRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
   },
   iconPanel: {
-    width: 104,
-    height: 104,
-    borderRadius: 30,
+    width: "clamp(64px, 18vw, 88px)",
+    height: "clamp(64px, 18vw, 88px)",
+    borderRadius: "clamp(20px, 5vw, 26px)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
+  iconPanelCompact: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+  },
   upNextTitle: {
-    fontSize: 28,
+    fontSize: "clamp(18px, 6vw, 24px)",
     fontWeight: 800,
     lineHeight: 1.06,
     color: "#0F1B4C",
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  upNextTitleCompact: {
+    fontSize: 15,
+    marginBottom: 3,
   },
   upNextLocation: {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    fontSize: 20,
+    fontSize: "clamp(13px, 4vw, 16px)",
     color: "#6B7280",
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  upNextLocationCompact: {
+    fontSize: 10,
+    marginBottom: 3,
+    gap: 5,
   },
   upNextCountdown: {
-    fontSize: 22,
+    fontSize: "clamp(14px, 4.6vw, 18px)",
     fontWeight: 600,
+  },
+  upNextCountdownCompact: {
+    fontSize: 10,
   },
   primaryPillButton: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    minHeight: 66,
-    minWidth: 230,
-    padding: "0 26px",
+    minHeight: "clamp(44px, 12vw, 52px)",
+    width: "min(100%, 168px)",
+    maxWidth: "100%",
+    padding: "0 14px",
     border: "none",
-    borderRadius: 22,
+    borderRadius: "clamp(16px, 5vw, 20px)",
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: "clamp(13px, 4vw, 15px)",
     fontWeight: 700,
     cursor: "pointer",
     boxShadow: "0 22px 44px rgba(91,61,245,0.24)",
   },
+  primaryPillButtonCompact: {
+    minHeight: 30,
+    width: 96,
+    padding: "0 10px",
+    borderRadius: 11,
+    fontSize: 10,
+    gap: 5,
+  },
   sectionBlock: {
-    marginBottom: 26,
+    marginBottom: 18,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 700,
     color: "#6B7280",
-    marginBottom: 12,
-    paddingLeft: 116,
+    marginBottom: 10,
+    paddingLeft: "clamp(62px, 24vw, 96px)",
+  },
+  sectionTitleCompact: {
+    fontSize: 12,
+    marginBottom: 8,
+    paddingLeft: 46,
   },
   sectionRows: {
     display: "flex",
     flexDirection: "column",
-    gap: 18,
+    gap: 12,
+  },
+  sectionRowsCompact: {
+    gap: 10,
   },
   timelineRow: {
     display: "grid",
-    gridTemplateColumns: "82px 20px minmax(0, 1fr)",
-    gap: 16,
+    gridTemplateColumns: "clamp(44px, 14vw, 64px) 12px minmax(0, 1fr)",
+    gap: "clamp(8px, 3vw, 12px)",
     alignItems: "stretch",
   },
+  timelineRowCompact: {
+    gridTemplateColumns: "40px 10px minmax(0, 1fr)",
+    gap: 8,
+  },
   timeRailColumn: {
-    paddingTop: 18,
+    paddingTop: 10,
     textAlign: "left",
   },
+  timeRailColumnCompact: {
+    paddingTop: 8,
+  },
   timeRailTime: {
-    fontSize: 28,
+    fontSize: "clamp(16px, 5.6vw, 22px)",
     fontWeight: 700,
     color: "#111827",
     lineHeight: 1,
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  timeRailTimeCompact: {
+    fontSize: 13,
   },
   timeRailPeriod: {
-    fontSize: 16,
+    fontSize: "clamp(10px, 3.3vw, 13px)",
     fontWeight: 500,
     color: "#6B7280",
     lineHeight: 1,
+  },
+  timeRailPeriodCompact: {
+    fontSize: 8.5,
   },
   railTrackWrap: {
     position: "relative",
@@ -950,106 +1092,162 @@ const styles: Record<string, React.CSSProperties> = {
   },
   railDot: {
     position: "absolute",
-    top: 40,
-    width: 18,
-    height: 18,
+    top: 28,
+    width: 14,
+    height: 14,
     borderRadius: "50%",
-    border: "4px solid rgba(255,255,255,0.96)",
+    border: "3px solid rgba(255,255,255,0.96)",
     boxShadow: "0 10px 20px rgba(91,61,245,0.18)",
+  },
+  railDotCompact: {
+    top: 22,
+    width: 12,
+    height: 12,
+    borderWidth: 2.5,
   },
   toatCard: {
     display: "flex",
     alignItems: "center",
-    gap: 18,
-    minHeight: 142,
-    padding: "22px 26px",
-    borderRadius: 34,
+    gap: "clamp(10px, 3vw, 14px)",
+    minHeight: "clamp(92px, 28vw, 118px)",
+    padding: "clamp(14px, 4vw, 18px) clamp(14px, 4.4vw, 18px)",
+    borderRadius: "clamp(20px, 7vw, 28px)",
     background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.84))",
     border: "1px solid rgba(255,255,255,0.94)",
     boxShadow: "0 26px 80px rgba(31,41,55,0.08)",
     cursor: "pointer",
     outline: "none",
   },
+  toatCardCompact: {
+    gap: 10,
+    minHeight: 84,
+    padding: "12px 12px",
+    borderRadius: 20,
+  },
   cardBody: {
     flex: 1,
     minWidth: 0,
     display: "flex",
     flexDirection: "column",
-    gap: 16,
+    gap: 10,
+  },
+  cardBodyCompact: {
+    gap: 8,
   },
   cardHeader: {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 18,
+    gap: 12,
+  },
+  cardHeaderCompact: {
+    gap: 8,
   },
   cardTitle: {
-    fontSize: 22,
+    fontSize: "clamp(16px, 5vw, 19px)",
     fontWeight: 700,
     color: "#0F172A",
     lineHeight: 1.1,
-    marginBottom: 10,
+    marginBottom: 6,
+  },
+  cardTitleCompact: {
+    fontSize: 12,
+    marginBottom: 4,
   },
   cardMeta: {
     display: "flex",
     alignItems: "center",
-    gap: 8,
-    fontSize: 18,
+    gap: 6,
+    fontSize: "clamp(12px, 3.6vw, 14px)",
     color: "#6B7280",
     lineHeight: 1.3,
+  },
+  cardMetaCompact: {
+    fontSize: 10,
+    gap: 4,
   },
   cardFooter: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 14,
+    gap: 10,
     flexWrap: "wrap",
+  },
+  cardFooterCompact: {
+    gap: 8,
   },
   kindPill: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 999,
-    padding: "10px 14px",
-    fontSize: 15,
+    padding: "6px 10px",
+    fontSize: "clamp(12px, 3.6vw, 15px)",
     fontWeight: 700,
+  },
+  kindPillCompact: {
+    padding: "5px 8px",
+    fontSize: 10,
   },
   cardActionButton: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    minHeight: 56,
-    minWidth: 176,
-    padding: "0 18px",
+    minHeight: "clamp(38px, 10vw, 44px)",
+    minWidth: "clamp(88px, 28vw, 120px)",
+    padding: "0 12px",
     border: "none",
-    borderRadius: 18,
-    fontSize: 18,
+    borderRadius: "clamp(14px, 4vw, 16px)",
+    fontSize: "clamp(12px, 3.6vw, 14px)",
     fontWeight: 700,
     cursor: "pointer",
+  },
+  cardActionButtonCompact: {
+    minHeight: 32,
+    minWidth: 74,
+    padding: "0 10px",
+    borderRadius: 10,
+    fontSize: 10.5,
+    gap: 6,
+  },
+  timelineIconPanel: {
+    width: "clamp(64px, 18vw, 78px)",
+    height: "clamp(64px, 18vw, 78px)",
+    borderRadius: "clamp(20px, 5vw, 24px)",
+  },
+  timelineIconPanelCompact: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
   },
   clearCard: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 20,
-    padding: "24px 30px",
-    borderRadius: 32,
+    gap: 12,
+    padding: "clamp(14px, 4.2vw, 18px) clamp(14px, 4.6vw, 18px)",
+    borderRadius: "clamp(24px, 8vw, 32px)",
     background: "linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,247,239,0.86))",
     border: "1px solid rgba(255,255,255,0.92)",
     boxShadow: "0 28px 80px rgba(31,41,55,0.08)",
     overflow: "hidden",
   },
+  clearCardCompact: {
+    gap: 8,
+    padding: "12px 12px",
+    borderRadius: 18,
+  },
   clearTextWrap: {
     display: "flex",
     alignItems: "center",
-    gap: 16,
+    gap: 12,
     flex: 1,
     minWidth: 0,
   },
   clearSparkle: {
-    width: 48,
-    height: 48,
+    width: 38,
+    height: 38,
     borderRadius: "50%",
     background: "rgba(91,61,245,0.08)",
     color: "#5B3DF5",
@@ -1058,21 +1256,36 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     flexShrink: 0,
   },
+  clearSparkleCompact: {
+    width: 30,
+    height: 30,
+  },
   clearHeadline: {
-    fontSize: 18,
+    fontSize: "clamp(15px, 4.4vw, 18px)",
     fontWeight: 700,
     color: "#0F172A",
     marginBottom: 6,
   },
+  clearHeadlineCompact: {
+    fontSize: 13,
+    marginBottom: 3,
+  },
   clearSub: {
-    fontSize: 17,
+    fontSize: "clamp(13px, 4vw, 17px)",
     color: "#6B7280",
+  },
+  clearSubCompact: {
+    fontSize: 10,
   },
   clearScene: {
     position: "relative",
-    width: 210,
-    height: 80,
+    width: "clamp(92px, 24vw, 150px)",
+    height: "clamp(42px, 12vw, 60px)",
     flexShrink: 0,
+  },
+  clearSceneCompact: {
+    width: 78,
+    height: 38,
   },
   clearSceneSun: {
     position: "absolute",
@@ -1084,6 +1297,13 @@ const styles: Record<string, React.CSSProperties> = {
     background: "radial-gradient(circle, #FDBA74, #F59E0B)",
     boxShadow: "0 0 0 18px rgba(251,191,36,0.12)",
   },
+  clearSceneSunCompact: {
+    right: 48,
+    bottom: 10,
+    width: 40,
+    height: 40,
+    boxShadow: "0 0 0 12px rgba(251,191,36,0.12)",
+  },
   clearSceneHillOne: {
     position: "absolute",
     left: 28,
@@ -1093,6 +1313,10 @@ const styles: Record<string, React.CSSProperties> = {
     borderTopLeftRadius: 60,
     borderTopRightRadius: 80,
     background: "linear-gradient(90deg, rgba(244,114,182,0.32), rgba(139,92,246,0.26))",
+  },
+  clearSceneHillOneCompact: {
+    left: 18,
+    height: 24,
   },
   clearSceneHillTwo: {
     position: "absolute",
@@ -1104,22 +1328,27 @@ const styles: Record<string, React.CSSProperties> = {
     borderTopRightRadius: 90,
     background: "linear-gradient(90deg, rgba(139,92,246,0.2), rgba(56,189,248,0.16))",
   },
+  clearSceneHillTwoCompact: {
+    left: 46,
+    right: -10,
+    height: 18,
+  },
   emptyCard: {
     position: "relative",
-    minHeight: 440,
-    borderRadius: 40,
-    padding: "38px 38px 30px",
+    minHeight: "clamp(320px, 84vw, 400px)",
+    borderRadius: "clamp(28px, 8vw, 40px)",
+    padding: "clamp(22px, 6vw, 30px) clamp(18px, 5vw, 24px) clamp(18px, 5vw, 22px)",
     overflow: "hidden",
     background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,248,252,0.84))",
     border: "1px solid rgba(255,255,255,0.9)",
     boxShadow: "0 30px 90px rgba(31,41,55,0.08)",
   },
   emptyBadgeWrap: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   emptyBadge: {
-    width: 52,
-    height: 52,
+    width: 46,
+    height: 46,
     borderRadius: "50%",
     background: "rgba(91,61,245,0.10)",
     color: "#5B3DF5",
@@ -1128,31 +1357,49 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
   },
   emptyTitle: {
-    fontSize: 42,
+    fontSize: "clamp(28px, 8vw, 36px)",
     lineHeight: 1,
     fontWeight: 800,
     letterSpacing: "-0.04em",
     color: "#0F1B4C",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   emptyBody: {
     maxWidth: 540,
-    fontSize: 19,
+    fontSize: "clamp(15px, 4.4vw, 19px)",
     lineHeight: 1.55,
     color: "#6B7280",
-    marginBottom: 26,
+    marginBottom: 18,
   },
   emptyCaptureButton: {
-    minHeight: 58,
-    padding: "0 22px",
-    borderRadius: 18,
+    minHeight: 52,
+    padding: "0 18px",
+    borderRadius: 16,
     border: "none",
     background: "linear-gradient(135deg, #5B3DF5, #7C3AED)",
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: "clamp(15px, 4.4vw, 18px)",
     fontWeight: 700,
     cursor: "pointer",
     boxShadow: "0 22px 44px rgba(91,61,245,0.22)",
+  },
+  emptyActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  emptyTextButton: {
+    minHeight: 52,
+    padding: "0 18px",
+    borderRadius: 16,
+    border: "1px solid rgba(91,61,245,0.16)",
+    background: "rgba(255,255,255,0.78)",
+    color: "#5B3DF5",
+    fontSize: "clamp(15px, 4.4vw, 18px)",
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 18px 38px rgba(31,41,55,0.06)",
   },
   emptySun: {
     position: "absolute",
@@ -1177,7 +1424,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     bottom: 0,
-    height: 150,
+    height: "clamp(112px, 34vw, 150px)",
   },
   sunDisc: {
     position: "absolute",
@@ -1207,5 +1454,24 @@ const styles: Record<string, React.CSSProperties> = {
     borderTopLeftRadius: 120,
     borderTopRightRadius: 120,
     background: "linear-gradient(90deg, rgba(139,92,246,0.22), rgba(56,189,248,0.18))",
+  },
+  textCaptureDockButton: {
+    position: "fixed",
+    right: "max(112px, calc((100vw - min(100vw - 16px, 860px)) / 2 + 116px))",
+    bottom: "calc(env(safe-area-inset-bottom, 0px) + 110px)",
+    width: 46,
+    height: 46,
+    padding: 0,
+    borderRadius: "50%",
+    border: "1px solid rgba(255,255,255,0.88)",
+    background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.84))",
+    boxShadow: "0 18px 40px rgba(31,41,55,0.1)",
+    color: "#5B3DF5",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    zIndex: 45,
+    backdropFilter: "blur(16px)",
   },
 };

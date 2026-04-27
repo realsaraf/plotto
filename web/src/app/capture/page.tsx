@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { TopNav } from "@/components/TopNav";
 import { useAuth } from "@/lib/auth/auth-context";
 
 type CaptureStatus = "idle" | "listening" | "processing" | "review" | "error";
+type CaptureMode = "voice" | "text";
 
 const WAVEFORM_BARS = 20;
 
@@ -58,7 +59,16 @@ function getCaptureStartErrorMessage(error: unknown): string {
 }
 
 export default function CapturePage() {
+  return (
+    <Suspense fallback={<CapturePageFallback />}>
+      <CapturePageContent />
+    </Suspense>
+  );
+}
+
+function CapturePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
 
   const [status, setStatus] = useState<CaptureStatus>("idle");
@@ -68,6 +78,7 @@ export default function CapturePage() {
   const [toats, setToats] = useState<ExtractedToat[]>([]);
   const [selected, setSelected] = useState<boolean[]>([]);
   const [errorMsg, setErrorMsg] = useState("");
+  const [manualText, setManualText] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -77,6 +88,9 @@ export default function CapturePage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const hasAutoStartedRef = useRef(false);
+
+  const captureMode: CaptureMode = searchParams.get("mode") === "text" ? "text" : "voice";
+  const shouldAutoStart = searchParams.get("autostart") === "1";
 
   const resetWaveform = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
@@ -202,15 +216,13 @@ export default function CapturePage() {
   }, [clearTimer, closeAudioContext, getIdToken, resetWaveform, startWaveform, stopStream]);
 
   useEffect(() => {
-    const shouldAutoStart = new URLSearchParams(window.location.search).get("autostart") === "1";
-
-    if (!shouldAutoStart || hasAutoStartedRef.current || status !== "idle") {
+    if (!shouldAutoStart || captureMode !== "voice" || hasAutoStartedRef.current || status !== "idle") {
       return;
     }
 
     hasAutoStartedRef.current = true;
     void startCapture();
-  }, [startCapture, status]);
+  }, [captureMode, shouldAutoStart, startCapture, status]);
 
   const stopCapture = () => {
     clearTimer();
@@ -226,6 +238,69 @@ export default function CapturePage() {
     router.push("/timeline");
   }, [router, stopAll]);
 
+  const setMode = useCallback((nextMode: CaptureMode) => {
+    stopAll();
+    hasAutoStartedRef.current = false;
+    setStatus("idle");
+    setErrorMsg("");
+
+    if (nextMode === "text") {
+      router.replace("/capture?mode=text");
+      return;
+    }
+
+    router.replace("/capture");
+  }, [router, stopAll]);
+
+  const submitTextCapture = useCallback(async () => {
+    const trimmed = manualText.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setTranscript("");
+    setToats([]);
+    setSelected([]);
+    setErrorMsg("");
+    setStatus("processing");
+
+    const token = await getIdToken();
+    if (!token) {
+      setStatus("error");
+      setErrorMsg("Sign in required.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/captures", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          transcript: trimmed,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`${response.status}`);
+      }
+
+      const data = await response.json();
+      setTranscript(data.transcript ?? trimmed);
+      const extracted: ExtractedToat[] = (data.toats ?? []).map((toat: ExtractedToat) => ({ ...toat }));
+      setToats(extracted);
+      setSelected(extracted.map(() => true));
+      setStatus("review");
+    } catch (error) {
+      console.error("[capture/text]", error);
+      setStatus("error");
+      setErrorMsg("Something went wrong. Try again.");
+    }
+  }, [getIdToken, manualText]);
+
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
@@ -233,6 +308,7 @@ export default function CapturePage() {
   const isProcessing = status === "processing";
   const isReview = status === "review";
   const selectedCount = selected.filter(Boolean).length;
+  const isTextMode = captureMode === "text";
 
   if (isReview) {
     return (
@@ -262,68 +338,153 @@ export default function CapturePage() {
           <div>
             <h1 style={S.title}>Capture</h1>
             <p style={S.subtitle}>
-              {isActive ? "Tap the mic to stop when you're done."
-                : isProcessing ? "Thinking…"
-                : status === "error" ? (errorMsg || "Something went wrong.")
-                : "Tap the mic and tell me what's on your mind."}
+                {isTextMode
+                  ? isProcessing
+                    ? "Turning your note into toats."
+                    : status === "error"
+                      ? (errorMsg || "Something went wrong.")
+                      : "Type whatever is on your mind. Toatre will split it into toats for you."
+                  : isActive
+                    ? "Tap the mic to stop when you're done."
+                    : isProcessing
+                      ? "Thinking…"
+                      : status === "error"
+                        ? (errorMsg || "Something went wrong.")
+                        : "Tap the mic and tell me what's on your mind."}
             </p>
           </div>
           <div style={S.pill}>✨ Toatre listens, you live.</div>
         </div>
 
-        {/* Waveform + mic */}
-        <div style={S.waveSection}>
-          <div style={S.statusRow}>
-            {isActive && <><span style={S.dot} /><span style={{ color: "var(--color-primary)", fontWeight: 600 }}>Listening…</span></>}
-            {isProcessing && <><SpinIcon /><span style={{ color: "var(--color-primary)", fontWeight: 600 }}>Thinking…</span></>}
-            {status === "idle" && <span style={{ color: "var(--color-text-muted)", fontSize: 14 }}>Ready when you are</span>}
-            {status === "error" && <span style={{ color: "#EF4444", fontWeight: 600 }}>{errorMsg || "Couldn't start the mic. Try again."}</span>}
-          </div>
-
-          <div style={S.waveRow}>
-            <div style={S.barGroup}>
-              {barHeights.slice(0, WAVEFORM_BARS / 2).map((h, i) => (
-                <div key={i} style={{ ...S.bar, height: h, background: "linear-gradient(to top, #6366F1, #8B5CF6)", opacity: isActive ? 1 : 0.2 }} />
-              ))}
-            </div>
+          <div style={S.modeSwitch}>
             <button
-              onClick={isActive ? stopCapture : startCapture}
-              disabled={isProcessing}
-              style={{ ...S.micBtn, ...(isActive ? S.micBtnActive : {}) }}
-              aria-label={isActive ? "Stop recording" : "Start recording"}
+              type="button"
+              onClick={() => setMode("voice")}
+              style={{ ...S.modeButton, ...(captureMode === "voice" ? S.modeButtonActive : {}) }}
             >
-              <div style={{ ...S.micRing, ...(isActive ? { animation: "pulse-ring 1.8s cubic-bezier(0.4,0,0.6,1) infinite" } : {}) }} />
-              {isProcessing ? <SpinIconLg /> : isActive ? <div style={S.stopSquare} /> : <MicIcon />}
+              Talk
             </button>
-            <div style={S.barGroup}>
-              {barHeights.slice(WAVEFORM_BARS / 2).map((h, i) => (
-                <div key={i} style={{ ...S.bar, height: h, background: "linear-gradient(to top, #F59E0B, #EC4899)", opacity: isActive ? 1 : 0.2 }} />
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setMode("text")}
+              style={{ ...S.modeButton, ...(captureMode === "text" ? S.modeButtonActive : {}) }}
+            >
+              Type
+            </button>
           </div>
 
-          {isActive && <p style={S.timer}>{formatTime(elapsed)}</p>}
-        </div>
+          {!isTextMode ? (
+            <>
+              <div style={S.waveSection}>
+                <div style={S.statusRow}>
+                  {isActive && <><span style={S.dot} /><span style={{ color: "var(--color-primary)", fontWeight: 600 }}>Listening…</span></>}
+                  {isProcessing && <><SpinIcon /><span style={{ color: "var(--color-primary)", fontWeight: 600 }}>Thinking…</span></>}
+                  {status === "idle" && <span style={{ color: "var(--color-text-muted)", fontSize: 14 }}>Ready when you are</span>}
+                  {status === "error" && <span style={{ color: "#EF4444", fontWeight: 600 }}>{errorMsg || "Couldn't start the mic. Try again."}</span>}
+                </div>
 
-        {isActive && (
+                <div style={S.waveRow}>
+                  <div style={S.barGroup}>
+                    {barHeights.slice(0, WAVEFORM_BARS / 2).map((h, i) => (
+                      <div key={i} style={{ ...S.bar, height: h, background: "linear-gradient(to top, #6366F1, #8B5CF6)", opacity: isActive ? 1 : 0.2 }} />
+                    ))}
+                  </div>
+                  <button
+                    onClick={isActive ? stopCapture : startCapture}
+                    disabled={isProcessing}
+                    style={{ ...S.micBtn, ...(isActive ? S.micBtnActive : {}) }}
+                    aria-label={isActive ? "Stop recording" : "Start recording"}
+                  >
+                    <div style={{ ...S.micRing, ...(isActive ? { animation: "pulse-ring 1.8s cubic-bezier(0.4,0,0.6,1) infinite" } : {}) }} />
+                    {isProcessing ? <SpinIconLg /> : isActive ? <div style={S.stopSquare} /> : <MicIcon />}
+                  </button>
+                  <div style={S.barGroup}>
+                    {barHeights.slice(WAVEFORM_BARS / 2).map((h, i) => (
+                      <div key={i} style={{ ...S.bar, height: h, background: "linear-gradient(to top, #F59E0B, #EC4899)", opacity: isActive ? 1 : 0.2 }} />
+                    ))}
+                  </div>
+                </div>
+
+                {isActive && <p style={S.timer}>{formatTime(elapsed)}</p>}
+              </div>
+
+              {isActive && (
+                <div style={S.privacy}>
+                  <LockIcon />
+                  Audio is not stored by default
+                </div>
+              )}
+
+              {status === "idle" && (
+                <div style={S.tip}>
+                  <span style={{ fontSize: 16 }}>💡</span>
+                  <span>You can say multiple things — I&apos;ll organise them for you.</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={S.textCaptureCard}>
+              <div style={S.statusRow}>
+                {isProcessing && <><SpinIcon /><span style={{ color: "var(--color-primary)", fontWeight: 600 }}>Capturing your note…</span></>}
+                {!isProcessing && status !== "error" && <span style={{ color: "var(--color-text-muted)", fontSize: 14 }}>Paste a brain dump or type a quick note</span>}
+                {status === "error" && <span style={{ color: "#EF4444", fontWeight: 600 }}>{errorMsg || "Couldn't capture that note. Try again."}</span>}
+              </div>
+
+              <textarea
+                value={manualText}
+                onChange={(event) => setManualText(event.target.value)}
+                placeholder="Try: Pick up son from Sunday school at 1, join the 2 p.m. team meeting, and remind me to send the deck tonight."
+                style={S.textarea}
+                disabled={isProcessing}
+              />
+
+              <div style={S.textFooter}>
+                <p style={S.textHint}>Toatre can split one typed note into multiple toats.</p>
+                <button
+                  type="button"
+                  onClick={() => void submitTextCapture()}
+                  disabled={isProcessing || manualText.trim().length === 0}
+                  style={{
+                    ...S.textSubmitButton,
+                    opacity: isProcessing || manualText.trim().length === 0 ? 0.55 : 1,
+                    cursor: isProcessing || manualText.trim().length === 0 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {isProcessing ? "Capturing…" : "Capture from text"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!isTextMode && isActive && (
           <div style={S.privacy}>
             <LockIcon />
             Audio is not stored by default
           </div>
         )}
 
-        {status === "idle" && (
-          <div style={S.tip}>
-            <span style={{ fontSize: 16 }}>💡</span>
-            <span>You can say multiple things — I&apos;ll organise them for you.</span>
-          </div>
-        )}
-
-        {(isActive || isProcessing || status === "error") && (
+          {(isTextMode || isActive || isProcessing || status === "error") && (
           <div style={{ textAlign: "center", marginTop: 28 }}>
             <button onClick={goToTimeline} style={S.cancelBtn}>Cancel</button>
           </div>
         )}
+      </main>
+    </div>
+  );
+}
+
+function CapturePageFallback() {
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--color-bg)" }}>
+      <TopNav />
+      <main style={S.main}>
+        <div style={S.header}>
+          <div>
+            <h1 style={S.title}>Capture</h1>
+            <p style={S.subtitle}>Loading capture…</p>
+          </div>
+          <div style={S.pill}>✨ Toatre listens, you live.</div>
+        </div>
       </main>
     </div>
   );
@@ -527,6 +688,9 @@ const S: Record<string, React.CSSProperties> = {
   title: { fontSize: 32, fontWeight: 800, color: "var(--color-text)", marginBottom: 6, lineHeight: 1.15 },
   subtitle: { fontSize: 15, color: "var(--color-text-secondary)", lineHeight: 1.5, maxWidth: 280 },
   pill: { display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "var(--color-card)", border: "1px solid var(--color-border-strong)", borderRadius: 20, fontSize: 13, fontWeight: 600, color: "var(--color-primary)", flexShrink: 0, boxShadow: "0 1px 6px rgba(99,102,241,0.10)", alignSelf: "flex-start" },
+  modeSwitch: { display: "inline-flex", alignItems: "center", gap: 8, padding: 6, marginBottom: 24, background: "rgba(255,255,255,0.9)", border: "1px solid var(--color-border)", borderRadius: 999, alignSelf: "flex-start", boxShadow: "0 12px 30px rgba(99,102,241,0.08)" },
+  modeButton: { minWidth: 88, minHeight: 42, borderRadius: 999, border: "none", background: "transparent", color: "var(--color-text-secondary)", fontSize: 14, fontWeight: 700, cursor: "pointer", padding: "0 18px" },
+  modeButtonActive: { background: "linear-gradient(135deg, rgba(99,102,241,0.14), rgba(236,72,153,0.12))", color: "var(--color-primary)" },
   waveSection: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16, marginBottom: 28 },
   statusRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, minHeight: 24 },
   dot: { width: 8, height: 8, borderRadius: "50%", background: "var(--color-primary)", animation: "pulse-ring 1.2s ease-in-out infinite" },
@@ -540,5 +704,10 @@ const S: Record<string, React.CSSProperties> = {
   timer: { fontSize: 22, fontWeight: 700, color: "var(--color-primary)", letterSpacing: "0.05em", fontVariantNumeric: "tabular-nums" },
   privacy: { display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#9CA3AF", justifyContent: "center", marginBottom: 8 },
   tip: { display: "flex", alignItems: "flex-start", gap: 10, padding: "14px 18px", background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 14, fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 24 },
+  textCaptureCard: { display: "flex", flexDirection: "column", gap: 18, padding: "22px 22px 20px", borderRadius: 24, background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.84))", border: "1px solid rgba(255,255,255,0.92)", boxShadow: "0 22px 60px rgba(31,41,55,0.08)", marginBottom: 24 },
+  textarea: { width: "100%", minHeight: 220, resize: "vertical", borderRadius: 20, border: "1px solid var(--color-border)", padding: "18px 18px 20px", fontSize: 16, lineHeight: 1.6, color: "var(--color-text)", outline: "none", background: "rgba(251,250,255,0.98)", boxShadow: "inset 0 1px 2px rgba(15,23,42,0.04)" },
+  textFooter: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" },
+  textHint: { fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.5, flex: 1, minWidth: 220 },
+  textSubmitButton: { minHeight: 54, padding: "0 20px", borderRadius: 18, border: "none", background: "linear-gradient(135deg, #5B3DF5, #7C3AED)", color: "#FFFFFF", fontSize: 15, fontWeight: 700, boxShadow: "0 18px 36px rgba(91,61,245,0.22)" },
   cancelBtn: { background: "none", border: "1px solid var(--color-border)", borderRadius: 10, padding: "8px 24px", fontSize: 14, color: "var(--color-text-muted)", cursor: "pointer" },
 };

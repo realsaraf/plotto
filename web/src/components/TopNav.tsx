@@ -10,14 +10,9 @@ interface TopNavProps {
 }
 
 export function TopNav({ title }: TopNavProps) {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-
-  const handleSignOut = async () => {
-    await signOut();
-    router.push("/login");
-  };
 
   const initials = user?.displayName
     ? user.displayName
@@ -49,7 +44,8 @@ export function TopNav({ title }: TopNavProps) {
 
           {/* Avatar / profile menu (simple dropdown-free for Phase 1) */}
           {user && (
-            <div style={styles.avatarWrap}>
+            <button type="button" onClick={() => router.push("/settings")} style={styles.avatarButton} aria-label="Open profile settings">
+              <div style={styles.avatarWrap}>
               {user.photoURL ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
@@ -63,16 +59,8 @@ export function TopNav({ title }: TopNavProps) {
               )}
               {/* Green online dot */}
               <span style={styles.onlineDot} aria-hidden />
-              {/* Hidden sign-out — revealed on hover via title tooltip for now */}
-              <button
-                onClick={handleSignOut}
-                title="Sign out"
-                style={styles.signOutBtn}
-                aria-label="Sign out"
-              >
-                ↩
-              </button>
-            </div>
+              </div>
+            </button>
           )}
         </nav>
       </div>
@@ -162,9 +150,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
   avatarWrap: {
     position: "relative",
-    marginLeft: 4,
     display: "flex",
     alignItems: "center",
+  },
+  avatarButton: {
+    marginLeft: 4,
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    cursor: "pointer",
   },
   avatarImg: {
     width: 34,
@@ -195,17 +189,5 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "50%",
     background: "#22C55E",
     border: "2px solid #fff",
-  },
-  signOutBtn: {
-    position: "absolute",
-    inset: 0,
-    width: "100%",
-    height: "100%",
-    borderRadius: "50%",
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    opacity: 0,
-    fontSize: 0,
   },
 };

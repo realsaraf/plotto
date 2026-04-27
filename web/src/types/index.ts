@@ -116,8 +116,15 @@ export interface UserSettingsDoc {
   voiceRetention: boolean;
   smsEnabled: boolean;
   reminderPhone: string | null;
+  pendingPhone?: string | null;
+  phoneVerifiedAt?: Date | string | null;
   workStart: string;        // "HH:MM" in user's timezone
   workEnd: string;
+  notificationPreferences?: Record<ToatKind, {
+    push: boolean;
+    email: boolean;
+    sms: boolean;
+  }>;
   updatedAt: Date;
 }
 
