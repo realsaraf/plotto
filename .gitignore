@@ -113,9 +113,6 @@ web/*.tsbuildinfo
 # Sentry
 web/.sentryclirc
 
-# Vercel (we don't deploy to Vercel but the CLI may drop these)
-web/.vercel/
-
 # =====================================================================
 # Misc
 # =====================================================================
