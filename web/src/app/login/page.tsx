@@ -19,9 +19,11 @@ export default function LoginPage() {
       const { hasHandle } = await signInWithGoogle();
       router.push(hasHandle ? "/timeline" : "/signup");
     } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? "";
       const msg = e instanceof Error ? e.message : "";
-      if (!msg.includes("popup-closed") && !msg.includes("cancelled")) {
-        setError("Google sign-in failed. Please try again.");
+      console.error("[login] google sign-in failed", { code, msg, raw: e });
+      if (!code.includes("popup-closed") && !msg.includes("cancelled")) {
+        setError(`Google sign-in failed${code ? ` (${code})` : ""}. Please try again.`);
       }
     } finally {
       setBusy(null);
@@ -35,9 +37,11 @@ export default function LoginPage() {
       const { hasHandle } = await signInWithApple();
       router.push(hasHandle ? "/timeline" : "/signup");
     } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? "";
       const msg = e instanceof Error ? e.message : "";
-      if (!msg.includes("popup-closed") && !msg.includes("cancelled")) {
-        setError("Apple sign-in failed. Please try again.");
+      console.error("[login] apple sign-in failed", { code, msg, raw: e });
+      if (!code.includes("popup-closed") && !msg.includes("cancelled")) {
+        setError(`Apple sign-in failed${code ? ` (${code})` : ""}. Please try again.`);
       }
     } finally {
       setBusy(null);
