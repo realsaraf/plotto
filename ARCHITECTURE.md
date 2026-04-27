@@ -77,7 +77,7 @@ Mutqin needs the headroom back):
 2. Use **Atlas Live Migration** (cluster-to-cluster, near-zero downtime,
    built-in Atlas tool) — OR — `mongodump` from old cluster + `mongorestore`
    into new during a planned 5–10 minute maintenance window.
-3. Update `MONGODB_URI` (and `MONGODB_DB` if renamed) in DigitalOcean App
+3. Update `MONGODB_URI` (and `MONGODB_DB_NAME` if renamed) in DigitalOcean App
    Platform + Codemagic env vars + locally.
 4. Redeploy web; mobile is unaware (it never sees the URI).
 5. Verify writes against the new cluster, then decommission the old DB
@@ -931,12 +931,13 @@ FIREBASE_PRIVATE_KEY=
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 
 # Mongo
 MONGODB_URI=
-MONGODB_DB=toatre
+MONGODB_DB_NAME=toatre
 
 # OpenAI
 OPENAI_API_KEY=

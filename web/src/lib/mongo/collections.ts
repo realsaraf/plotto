@@ -1,7 +1,10 @@
 import { Db } from "mongodb";
 import { getMongoClient } from "./client";
 
-const DB_NAME = process.env.MONGODB_DB_NAME ?? "toatre_prod";
+const DB_NAME =
+  process.env.MONGODB_DB_NAME ??
+  process.env.MONGODB_DB ??
+  "toatre_prod";
 
 async function getDb(): Promise<Db> {
   const client = await getMongoClient();
