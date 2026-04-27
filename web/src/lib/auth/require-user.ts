@@ -46,22 +46,37 @@ export async function requireUser(
   }
 
   const { users } = await getCollections();
-  let mongoUser = await users.findOne({ firebaseUid: decodedToken.uid });
+  let mongoUser;
+  try {
+    mongoUser = await users.findOne({ firebaseUid: decodedToken.uid });
 
-  if (!mongoUser) {
-    // First-time login — create the user record.
-    const now = new Date();
-    const result = await users.insertOne({
-      firebaseUid: decodedToken.uid,
-      email: decodedToken.email ?? null,
-      handle: null,
-      displayName: decodedToken.name ?? null,
-      photoUrl: decodedToken.picture ?? null,
-      timezone: "UTC",
-      createdAt: now,
-      updatedAt: now,
-    });
-    mongoUser = await users.findOne({ _id: result.insertedId });
+    if (!mongoUser) {
+      // First-time login — create the user record.
+      const now = new Date();
+      const result = await users.insertOne({
+        firebaseUid: decodedToken.uid,
+        email: decodedToken.email ?? null,
+        handle: null,
+        displayName: decodedToken.name ?? null,
+        photoUrl: decodedToken.picture ?? null,
+        timezone: "UTC",
+        createdAt: now,
+        updatedAt: now,
+      });
+      mongoUser = await users.findOne({ _id: result.insertedId });
+    }
+  } catch (error) {
+    console.error("[requireUser] mongo failure", error);
+    return {
+      user: null,
+      errorResponse: NextResponse.json(
+        {
+          error: "User store unavailable",
+          message: error instanceof Error ? error.message : String(error),
+        },
+        { status: 500 }
+      ),
+    };
   }
 
   return {

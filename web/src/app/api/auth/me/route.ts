@@ -13,14 +13,25 @@ export async function GET(request: NextRequest) {
   const { user, errorResponse } = await requireUser(request);
   if (errorResponse) return errorResponse;
 
-  const { users } = await getCollections();
-  const mongoUser = await users.findOne({ firebaseUid: user.uid });
+  try {
+    const { users } = await getCollections();
+    const mongoUser = await users.findOne({ firebaseUid: user.uid });
 
-  return NextResponse.json({
-    uid: user.uid,
-    email: user.email,
-    handle: mongoUser?.handle ?? null,
-    displayName: mongoUser?.displayName ?? null,
-    photoUrl: mongoUser?.photoUrl ?? null,
-  });
+    return NextResponse.json({
+      uid: user.uid,
+      email: user.email,
+      handle: mongoUser?.handle ?? null,
+      displayName: mongoUser?.displayName ?? null,
+      photoUrl: mongoUser?.photoUrl ?? null,
+    });
+  } catch (error) {
+    console.error("[auth/me] failed", error);
+    return NextResponse.json(
+      {
+        error: "internal",
+        message: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
 }
