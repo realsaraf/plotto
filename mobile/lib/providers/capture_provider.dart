@@ -188,6 +188,19 @@ class CaptureProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleAllSelections() {
+    if (_toats.isEmpty) {
+      return;
+    }
+
+    if (_selectedIds.length == _toats.length) {
+      _selectedIds = <String>{};
+    } else {
+      _selectedIds = _toats.map((toat) => toat.id).toSet();
+    }
+    notifyListeners();
+  }
+
   void reset() {
     _elapsedTimer?.cancel();
     _waveformTimer?.cancel();

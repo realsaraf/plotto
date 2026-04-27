@@ -13,8 +13,8 @@
 
 ## 📊 Status Summary
 
-**Last updated:** 2026-04-26
-**Current phase:** Phase 0 — Accounts + scaffold (iOS CI ✅ deployed to TestFlight; remaining: Playwright account steps)
+**Last updated:** 2026-04-27
+**Current phase:** Phase 0 — Accounts + scaffold (iOS CI ✅ deployed to TestFlight; remaining: Playwright account steps; mobile parity push queued through Codemagic)
 **Platforms:** iOS (TestFlight first), Android (always-buildable, ships to Play Internal in Phase 8), Web (toatre.com)
 **Build mode:** AI-driven. Owner directs, agent builds end-to-end.
 
@@ -26,6 +26,14 @@
 - Updated Android app build configuration for the current Flutter plugin set: `compileSdk 36`, `minSdk 23`, `ndkVersion 27.0.12077973`, core-library desugaring, a minimal `proguard-rules.pro`, and Android `.kotlin` ignore coverage
 - Validation: `flutter analyze`, `flutter test`
 - Local Windows note: release Android builds now clear the earlier SDK/NDK/desugaring/ProGuard blockers but still crash the Gradle/JVM during R8 minification on this 15 GB host; Codemagic remains the authoritative next build check
+
+### Session 2026-04-27 (mobile web parity + Codemagic deploy prep) — completed
+- Added Flutter timeline parity for the web dock affordances: interactive Search, People, Inbox, and Calendar controls from the mobile timeline
+- Added a mobile Search screen over existing toat data with title, notes, kind, tier, location, and people matching plus tap-through to toat detail
+- Added a mobile People screen derived from people mentioned in toats, with person drilldowns and tap-through to related toats
+- Added a mobile Inbox placeholder surface for incoming shared toats/invites until the sharing backend is active
+- Matched the web capture review flow more closely by adding select-all/all-selected controls and disabling timeline confirmation when no toats are selected
+- Validation: `flutter analyze`, `flutter test`, VS Code Problems check
 
 ### Session 2026-04-26 (web settings saves + Twilio verify rename) — completed
 - Fixed `/api/settings` upserts so profile, SMS Ping, and per-kind Ping preference saves no longer collide on Mongo update paths when defaults are inserted

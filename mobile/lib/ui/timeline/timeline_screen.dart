@@ -6,6 +6,9 @@ import 'package:toatre/providers/capture_provider.dart';
 import 'package:toatre/providers/toats_provider.dart';
 import 'package:toatre/services/analytics_service.dart';
 import 'package:toatre/ui/capture/capture_screen.dart';
+import 'package:toatre/ui/inbox/inbox_screen.dart';
+import 'package:toatre/ui/people/people_screen.dart';
+import 'package:toatre/ui/search/search_screen.dart';
 import 'package:toatre/ui/settings/settings_screen.dart';
 import 'package:toatre/ui/toat/toat_detail_screen.dart';
 import 'package:toatre/utils/app_colors.dart';
@@ -91,9 +94,12 @@ class _TimelineScreenState extends State<TimelineScreen> {
                     ],
                   ),
                   const Spacer(),
-                  _HeaderIcon(icon: Icons.calendar_today_outlined),
+                  _HeaderIcon(
+                    icon: Icons.calendar_today_outlined,
+                    onTap: () => _openCalendarPicker(grouped),
+                  ),
                   const SizedBox(width: 12),
-                  _HeaderIcon(icon: Icons.tune_rounded),
+                  _HeaderIcon(icon: Icons.search_rounded, onTap: _openSearch),
                 ],
               ),
               const SizedBox(height: 28),
@@ -166,16 +172,21 @@ class _TimelineScreenState extends State<TimelineScreen> {
               label: 'Timeline',
               active: true,
             ),
-            const _BottomItem(icon: Icons.search_rounded, label: 'Search'),
+            _BottomItem(
+              icon: Icons.search_rounded,
+              label: 'Search',
+              onTap: _openSearch,
+            ),
             SizedBox(width: 52),
-            const _BottomItem(
+            _BottomItem(
               icon: Icons.people_outline_rounded,
               label: 'People',
+              onTap: _openPeople,
             ),
             _BottomItem(
-              icon: Icons.settings_outlined,
-              label: 'Settings',
-              onTap: _openSettings,
+              icon: Icons.inbox_outlined,
+              label: 'Inbox',
+              onTap: _openInbox,
             ),
           ],
         ),
@@ -217,6 +228,95 @@ class _TimelineScreenState extends State<TimelineScreen> {
       return;
     }
     await context.read<ToatsProvider>().fetchToats();
+  }
+
+  Future<void> _openSearch() async {
+    final changed = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => const SearchScreen()));
+    if (!mounted || changed != true) {
+      return;
+    }
+    await context.read<ToatsProvider>().fetchToats();
+  }
+
+  Future<void> _openPeople() async {
+    final changed = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => const PeopleScreen()));
+    if (!mounted || changed != true) {
+      return;
+    }
+    await context.read<ToatsProvider>().fetchToats();
+  }
+
+  Future<void> _openInbox() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const InboxScreen()));
+  }
+
+  Future<void> _openCalendarPicker(
+    Map<String, List<ToatSummary>> grouped,
+  ) async {
+    if (grouped.isEmpty) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.bgElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            shrinkWrap: true,
+            children: [
+              Center(
+                child: Container(
+                  width: 46,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.textMuted.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Calendar', style: TextStyles.heading1),
+              const SizedBox(height: 14),
+              ...grouped.entries.map(
+                (entry) => Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.bg,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(entry.key, style: TextStyles.bodyMedium),
+                      ),
+                      Text(
+                        '${entry.value.length}',
+                        style: TextStyles.smallMedium.copyWith(
+                          color: AppColors.primaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openToat(ToatSummary toat) async {
@@ -439,20 +539,25 @@ class _MicFab extends StatelessWidget {
 }
 
 class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon({required this.icon});
+  const _HeaderIcon({required this.icon, this.onTap});
 
   final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        color: AppColors.bgElevated,
-        borderRadius: BorderRadius.circular(18),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Icon(icon, color: AppColors.primary),
       ),
-      child: Icon(icon, color: AppColors.primary),
     );
   }
 }

@@ -590,6 +590,25 @@ class _ReviewState extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: capture.toats.isEmpty
+                  ? null
+                  : capture.toggleAllSelections,
+              icon: Icon(
+                capture.selectedCount == capture.toats.length
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+              ),
+              label: Text(
+                capture.selectedCount == capture.toats.length
+                    ? 'All selected'
+                    : 'Select all',
+              ),
+            ),
+          ),
           const SizedBox(height: 12),
           Expanded(
             child: ListView.separated(
@@ -609,17 +628,19 @@ class _ReviewState extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () async {
-                await context.read<ToatsProvider>().fetchToats();
-                capture.reset();
-                if (!context.mounted) return;
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const TimelineScreen(),
-                  ),
-                  (_) => false,
-                );
-              },
+              onPressed: capture.selectedCount == 0
+                  ? null
+                  : () async {
+                      await context.read<ToatsProvider>().fetchToats();
+                      capture.reset();
+                      if (!context.mounted) return;
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const TimelineScreen(),
+                        ),
+                        (_) => false,
+                      );
+                    },
               child: Text('Add to timeline (${capture.selectedCount})'),
             ),
           ),
