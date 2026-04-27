@@ -47,9 +47,7 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: Text('Toat', style: TextStyles.heading2),
-                  ),
+                  Expanded(child: Text('Toat', style: TextStyles.heading2)),
                   _IconCircleButton(
                     icon: Icons.copy_rounded,
                     onTap: _copyShareText,
@@ -109,7 +107,8 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
                             label: _workingAction == 'snooze'
                                 ? 'Saving…'
                                 : 'Snooze 1h',
-                            onTap: _workingAction == null && _toat.datetime != null
+                            onTap:
+                                _workingAction == null && _toat.datetime != null
                                 ? _snooze
                                 : null,
                           ),
@@ -121,7 +120,9 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
                           ),
                           _ActionChip(
                             label: _primaryActionLabel(_toat),
-                            onTap: _workingAction == null ? _copyPrimaryValue : null,
+                            onTap: _workingAction == null
+                                ? _copyPrimaryValue
+                                : null,
                           ),
                           _ActionChip(
                             label: _workingAction == 'delete'
@@ -138,11 +139,9 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
                       title: 'When & where',
                       child: Column(
                         children: [
-                          _InfoRow(
-                            label: 'When',
-                            value: _formatWhen(_toat),
-                          ),
-                          if (_toat.location != null && _toat.location!.isNotEmpty)
+                          _InfoRow(label: 'When', value: _formatWhen(_toat)),
+                          if (_toat.location != null &&
+                              _toat.location!.isNotEmpty)
                             _InfoRow(label: 'Where', value: _toat.location!),
                           if (_toat.people.isNotEmpty)
                             _InfoRow(
@@ -175,7 +174,9 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
                           if (_toat.createdAt != null)
                             _InfoRow(
                               label: 'Captured',
-                              value: DateFormat.yMMMd().add_jm().format(_toat.createdAt!),
+                              value: DateFormat.yMMMd().add_jm().format(
+                                _toat.createdAt!,
+                              ),
                             ),
                         ],
                       ),
@@ -262,7 +263,9 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
 
   Future<void> _duplicate() async {
     await _runAction('duplicate', () async {
-      final duplicated = await context.read<ToatsProvider>().duplicateToat(_toat);
+      final duplicated = await context.read<ToatsProvider>().duplicateToat(
+        _toat,
+      );
       if (!mounted) {
         return;
       }
@@ -271,7 +274,8 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
   }
 
   Future<void> _delete() async {
-    final shouldDelete = await showDialog<bool>(
+    final shouldDelete =
+        await showDialog<bool>(
           context: context,
           builder: (context) {
             return AlertDialog(
@@ -355,7 +359,9 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatWhen(ToatSummary toat) {
@@ -403,9 +409,9 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
   }
 
   String? _extractPhone(ToatSummary toat) {
-    final match = RegExp(r'(\+?\d[\d\s().-]{7,}\d)').firstMatch(
-      '${toat.title} ${toat.notes ?? ''}',
-    );
+    final match = RegExp(
+      r'(\+?\d[\d\s().-]{7,}\d)',
+    ).firstMatch('${toat.title} ${toat.notes ?? ''}');
     return match?.group(1);
   }
 }
@@ -439,7 +445,10 @@ class _HeroSection extends StatelessWidget {
             children: [
               _Pill(label: toat.kind.toUpperCase(), color: AppColors.primary),
               _Pill(label: toat.tier.toUpperCase(), color: AppColors.accent),
-              _Pill(label: toat.status.toUpperCase(), color: AppColors.textMuted),
+              _Pill(
+                label: toat.status.toUpperCase(),
+                color: AppColors.textMuted,
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -454,7 +463,9 @@ class _HeroSection extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               DateFormat.yMMMMd().add_jm().format(toat.datetime!),
-              style: TextStyles.bodyMedium.copyWith(color: AppColors.primaryLight),
+              style: TextStyles.bodyMedium.copyWith(
+                color: AppColors.primaryLight,
+              ),
             ),
           ],
         ],
@@ -536,7 +547,9 @@ class _ActionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: destructive ? const Color(0x22EF4444) : const Color(0x121C2540),
+          color: destructive
+              ? const Color(0x22EF4444)
+              : const Color(0x121C2540),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: destructive ? const Color(0x44EF4444) : AppColors.border,
@@ -567,10 +580,7 @@ class _Pill extends StatelessWidget {
         color: color.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Text(
-        label,
-        style: TextStyles.smallMedium.copyWith(color: color),
-      ),
+      child: Text(label, style: TextStyles.smallMedium.copyWith(color: color)),
     );
   }
 }

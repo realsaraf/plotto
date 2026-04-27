@@ -9,6 +9,7 @@ import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
 
 enum SettingsTab { general, phone, handle, pings }
+
 enum _NoticeTone { success, error }
 
 const Map<String, String> _kindLabels = <String, String>{
@@ -77,9 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: Text('Settings', style: TextStyles.heading2),
-                  ),
+                  Expanded(child: Text('Settings', style: TextStyles.heading2)),
                   _IconCircleButton(
                     icon: Icons.logout_rounded,
                     onTap: settingsProvider.savingKey == 'signout'
@@ -97,7 +96,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     _HeroCard(
                       displayName:
-                          payload?.profile.displayName ?? auth.user?.displayName,
+                          payload?.profile.displayName ??
+                          auth.user?.displayName,
                       email: payload?.profile.email ?? auth.user?.email,
                       handle: payload?.profile.handle,
                     ),
@@ -127,7 +127,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (settingsProvider.loading && payload == null) ...[
                       const SizedBox(height: 36),
                       const Center(child: CircularProgressIndicator()),
-                    ] else if (settingsProvider.error != null && payload == null) ...[
+                    ] else if (settingsProvider.error != null &&
+                        payload == null) ...[
                       const SizedBox(height: 24),
                       _ErrorCard(
                         message: settingsProvider.error!,
@@ -158,8 +159,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           verificationCode: _verificationCode,
                           smsEnabled: _smsEnabled,
                           settings: payload.settings,
-                          sendingCode: settingsProvider.savingKey == 'phone-start',
-                          verifying: settingsProvider.savingKey == 'phone-check',
+                          sendingCode:
+                              settingsProvider.savingKey == 'phone-start',
+                          verifying:
+                              settingsProvider.savingKey == 'phone-check',
                           saving: settingsProvider.savingKey == 'phone-save',
                           onPhoneChanged: (value) =>
                               setState(() => _phoneDraft = value),
@@ -203,7 +206,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _workEnd = payload.settings.workEnd;
     _voiceRetention = payload.settings.voiceRetention;
     _handleDraft = payload.profile.handle ?? '';
-    _phoneDraft = payload.settings.pendingPhone ?? payload.settings.reminderPhone ?? '';
+    _phoneDraft =
+        payload.settings.pendingPhone ?? payload.settings.reminderPhone ?? '';
     _verificationCode = '';
     _smsEnabled = payload.settings.smsEnabled;
     _notificationPreferences = <String, NotificationChannels>{
@@ -371,14 +375,13 @@ class _HeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            displayName ?? 'Your profile',
-            style: TextStyles.heading1,
-          ),
+          Text(displayName ?? 'Your profile', style: TextStyles.heading1),
           const SizedBox(height: 8),
           Text(
-            [if (handle != null && handle!.isNotEmpty) '@$handle', if (email != null && email!.isNotEmpty) email]
-                .join(' · '),
+            [
+              if (handle != null && handle!.isNotEmpty) '@$handle',
+              if (email != null && email!.isNotEmpty) email,
+            ].join(' · '),
             style: TextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -476,10 +479,7 @@ class _ErrorCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(message, style: TextStyles.small),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: onRetry,
-            child: const Text('Try again'),
-          ),
+          ElevatedButton(onPressed: onRetry, child: const Text('Try again')),
         ],
       ),
     );
@@ -537,7 +537,9 @@ class _GeneralTab extends StatelessWidget {
                   child: TextField(
                     onChanged: onWorkStartChanged,
                     controller: TextEditingController(text: workStart)
-                      ..selection = TextSelection.collapsed(offset: workStart.length),
+                      ..selection = TextSelection.collapsed(
+                        offset: workStart.length,
+                      ),
                     decoration: const InputDecoration(hintText: '09:00'),
                   ),
                 ),
@@ -549,7 +551,9 @@ class _GeneralTab extends StatelessWidget {
                   child: TextField(
                     onChanged: onWorkEndChanged,
                     controller: TextEditingController(text: workEnd)
-                      ..selection = TextSelection.collapsed(offset: workEnd.length),
+                      ..selection = TextSelection.collapsed(
+                        offset: workEnd.length,
+                      ),
                     decoration: const InputDecoration(hintText: '17:30'),
                   ),
                 ),
@@ -638,8 +642,9 @@ class _PhoneTab extends StatelessWidget {
             label: 'Phone number',
             child: TextField(
               onChanged: onPhoneChanged,
-              controller: TextEditingController(text: phoneDraft)
-                ..selection = TextSelection.collapsed(offset: phoneDraft.length),
+              controller: TextEditingController(
+                text: phoneDraft,
+              )..selection = TextSelection.collapsed(offset: phoneDraft.length),
               decoration: const InputDecoration(hintText: '+15551234567'),
             ),
           ),
@@ -666,7 +671,9 @@ class _PhoneTab extends StatelessWidget {
             child: TextField(
               onChanged: onCodeChanged,
               controller: TextEditingController(text: verificationCode)
-                ..selection = TextSelection.collapsed(offset: verificationCode.length),
+                ..selection = TextSelection.collapsed(
+                  offset: verificationCode.length,
+                ),
               decoration: const InputDecoration(hintText: '123456'),
             ),
           ),
@@ -687,7 +694,8 @@ class _PhoneTab extends StatelessWidget {
           const SizedBox(height: 16),
           _ToggleTile(
             title: 'Use SMS for urgent Pings',
-            body: 'SMS is optional and only works after your phone number is verified.',
+            body:
+                'SMS is optional and only works after your phone number is verified.',
             value: smsEnabled,
             onChanged: onSmsEnabledChanged,
           ),
@@ -746,7 +754,9 @@ class _HandleTab extends StatelessWidget {
                   child: TextField(
                     onChanged: onChanged,
                     controller: TextEditingController(text: handle)
-                      ..selection = TextSelection.collapsed(offset: handle.length),
+                      ..selection = TextSelection.collapsed(
+                        offset: handle.length,
+                      ),
                     decoration: const InputDecoration(hintText: 'yourname'),
                   ),
                 ),

@@ -58,11 +58,7 @@ class NotificationChannels {
     );
   }
 
-  NotificationChannels copyWith({
-    bool? push,
-    bool? email,
-    bool? sms,
-  }) {
+  NotificationChannels copyWith({bool? push, bool? email, bool? sms}) {
     return NotificationChannels(
       push: push ?? this.push,
       email: email ?? this.email,
@@ -71,11 +67,7 @@ class NotificationChannels {
   }
 
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'push': push,
-      'email': email,
-      'sms': sms,
-    };
+    return <String, dynamic>{'push': push, 'email': email, 'sms': sms};
   }
 }
 
@@ -175,7 +167,9 @@ class AppSettings {
       reminderPhone: clearReminderPhone
           ? null
           : reminderPhone ?? this.reminderPhone,
-      pendingPhone: clearPendingPhone ? null : pendingPhone ?? this.pendingPhone,
+      pendingPhone: clearPendingPhone
+          ? null
+          : pendingPhone ?? this.pendingPhone,
       phoneVerified: phoneVerified ?? this.phoneVerified,
       phoneVerifiedAt: clearPhoneVerifiedAt
           ? null
@@ -228,15 +222,14 @@ class SettingsPayload {
         profileJson is Map<String, dynamic> ? profileJson : <String, dynamic>{},
       ),
       settings: AppSettings.fromJson(
-        settingsJson is Map<String, dynamic> ? settingsJson : <String, dynamic>{},
+        settingsJson is Map<String, dynamic>
+            ? settingsJson
+            : <String, dynamic>{},
       ),
     );
   }
 
-  SettingsPayload copyWith({
-    SettingsProfile? profile,
-    AppSettings? settings,
-  }) {
+  SettingsPayload copyWith({SettingsProfile? profile, AppSettings? settings}) {
     return SettingsPayload(
       profile: profile ?? this.profile,
       settings: settings ?? this.settings,

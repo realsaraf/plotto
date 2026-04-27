@@ -13,7 +13,8 @@ export function proxy(req: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icon") ||
-    pathname.startsWith("/api/")
+    pathname.startsWith("/api/") ||
+    /\.[a-zA-Z0-9]+$/.test(pathname) // any file with an extension (png, svg, jpg, webp, etc.)
   ) {
     return NextResponse.next();
   }

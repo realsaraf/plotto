@@ -128,10 +128,8 @@ class _TimelineScreenState extends State<TimelineScreen> {
                     ),
                   ),
                   ...entry.value.map(
-                    (toat) => _TimelineRow(
-                      toat: toat,
-                      onTap: () => _openToat(toat),
-                    ),
+                    (toat) =>
+                        _TimelineRow(toat: toat, onTap: () => _openToat(toat)),
                   ),
                   const SizedBox(height: 14),
                 ],
@@ -144,9 +142,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
           ),
         ),
       ),
-      floatingActionButton: _MicFab(
-        onTap: _openVoiceCapture,
-      ),
+      floatingActionButton: _MicFab(onTap: _openVoiceCapture),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: Container(
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 18),
@@ -172,7 +168,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
             ),
             const _BottomItem(icon: Icons.search_rounded, label: 'Search'),
             SizedBox(width: 52),
-            const _BottomItem(icon: Icons.people_outline_rounded, label: 'People'),
+            const _BottomItem(
+              icon: Icons.people_outline_rounded,
+              label: 'People',
+            ),
             _BottomItem(
               icon: Icons.settings_outlined,
               label: 'Settings',
@@ -188,9 +187,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
     final capture = context.read<CaptureProvider>();
     capture.reset();
     capture.setMode(CaptureInputMode.voice);
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const CaptureScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const CaptureScreen()));
     if (!mounted) {
       return;
     }
@@ -201,9 +200,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
     final capture = context.read<CaptureProvider>();
     capture.reset();
     capture.setMode(CaptureInputMode.text);
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const CaptureScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const CaptureScreen()));
     if (!mounted) {
       return;
     }
@@ -211,9 +210,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   Future<void> _openSettings() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
     if (!mounted) {
       return;
     }
@@ -510,7 +509,10 @@ class _UpNextCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   gradient: AppColors.brandGradient,
                   borderRadius: BorderRadius.circular(18),
@@ -585,7 +587,9 @@ class _TimelineRow extends StatelessWidget {
                       height: 64,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
-                        gradient: LinearGradient(colors: _kindColors(toat.kind)),
+                        gradient: LinearGradient(
+                          colors: _kindColors(toat.kind),
+                        ),
                       ),
                       child: Icon(
                         _kindIcon(toat.kind),

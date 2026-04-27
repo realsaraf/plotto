@@ -74,7 +74,7 @@ export default function LoginPage() {
         </div>
 
         <h1 style={styles.heading}>Welcome back</h1>
-        <p style={styles.subtext}>Your mic-first personal timeline.</p>
+        <p style={styles.subtext}>Own your slice of time.</p>
 
         {error && <div style={styles.errorBox}>{error}</div>}
 

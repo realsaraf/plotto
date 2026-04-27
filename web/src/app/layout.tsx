@@ -5,7 +5,7 @@ import "./globals.css";
 
 const metadataBase = new URL("https://toatre.com");
 const defaultDescription =
-  "Speak your thoughts, tasks, events, and ideas. Toatre organises them into a smart personal timeline.";
+  "Toatre turns what you say into toats: clear slices of your day you can manage, remember, and share.";
 const defaultOpenGraphImage = "/opengraph-image";
 
 const inter = Inter({
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   metadataBase,
   applicationName: "Toatre",
   title: {
-    default: "Toatre — mic-first personal timeline",
+    default: "Toatre — Own your slice of time",
     template: "%s | Toatre",
   },
   description: defaultDescription,
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     siteName: "Toatre",
-    title: "Toatre — mic-first personal timeline",
+    title: "Toatre — Own your slice of time",
     description: defaultDescription,
     images: [
       {
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Toatre — mic-first personal timeline",
+    title: "Toatre — Own your slice of time",
     description: defaultDescription,
     images: [defaultOpenGraphImage],
   },

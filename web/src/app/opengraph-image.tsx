@@ -60,7 +60,7 @@ export default async function OpenGraphImage() {
             >
               Toatre
             </span>
-            <span style={{ color: "#64748b", fontSize: 24 }}>mic-first personal timeline</span>
+            <span style={{ color: "#64748b", fontSize: 24 }}>voice-first time assistant</span>
           </div>
 
           <div
@@ -71,10 +71,10 @@ export default async function OpenGraphImage() {
             }}
           >
             <div style={{ fontSize: 74, lineHeight: 1.02, fontWeight: 800, letterSpacing: -2.6 }}>
-              Say it. Toatre gets it.
+              Own your slice of time.
             </div>
             <div style={{ fontSize: 32, lineHeight: 1.3, color: "#334155" }}>
-              Capture your day with your voice, turn it into toats, and keep your timeline moving.
+              Turn what you say into toats: clear slices of your day you can manage, remember, and share.
             </div>
           </div>
         </div>

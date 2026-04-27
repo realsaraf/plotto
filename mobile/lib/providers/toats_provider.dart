@@ -59,10 +59,7 @@ class ToatsProvider extends ChangeNotifier {
     return ToatSummary.fromJson(toatJson);
   }
 
-  Future<ToatSummary> updateToat(
-    String id,
-    Map<String, Object?> body,
-  ) async {
+  Future<ToatSummary> updateToat(String id, Map<String, Object?> body) async {
     final response = await _api.patchJson(
       '/api/toats/$id',
       body: body,

@@ -45,8 +45,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
               return _TextCaptureState(
                 capture: capture,
                 controller: _textController,
-                onOpenVoiceMode: () =>
-                    capture.setMode(CaptureInputMode.voice),
+                onOpenVoiceMode: () => capture.setMode(CaptureInputMode.voice),
               );
             }
 
@@ -62,10 +61,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
 }
 
 class _ListeningState extends StatelessWidget {
-  const _ListeningState({
-    required this.capture,
-    required this.onOpenTextMode,
-  });
+  const _ListeningState({required this.capture, required this.onOpenTextMode});
 
   final CaptureProvider capture;
   final VoidCallback onOpenTextMode;
@@ -415,7 +411,10 @@ class _TextCaptureState extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 30),
-          Text('Type a capture', style: TextStyles.display.copyWith(fontSize: 38)),
+          Text(
+            'Type a capture',
+            style: TextStyles.display.copyWith(fontSize: 38),
+          ),
           const SizedBox(height: 10),
           Text(
             'Write what needs to happen next and Toatre will turn it into toats.',
@@ -451,7 +450,8 @@ class _TextCaptureState extends StatelessWidget {
               minLines: 9,
               textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
-                hintText: 'Call the dentist tomorrow, send Priya the deck, and remind me to buy groceries on the way home.',
+                hintText:
+                    'Call the dentist tomorrow, send Priya the deck, and remind me to buy groceries on the way home.',
                 hintStyle: TextStyles.body.copyWith(color: AppColors.textMuted),
                 border: InputBorder.none,
               ),
@@ -489,7 +489,9 @@ class _TextCaptureState extends StatelessWidget {
                   onPressed: capture.isProcessing
                       ? null
                       : () => capture.submitTextCapture(controller.text),
-                  child: Text(capture.isProcessing ? 'Thinking…' : 'Add text capture'),
+                  child: Text(
+                    capture.isProcessing ? 'Thinking…' : 'Add text capture',
+                  ),
                 ),
               ),
             ],
