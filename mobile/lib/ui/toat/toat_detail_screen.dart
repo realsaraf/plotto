@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:toatre/models/toat_summary.dart';
 import 'package:toatre/providers/toats_provider.dart';
 import 'package:toatre/services/analytics_service.dart';
+import 'package:toatre/ui/toat/share_toat_screen.dart';
 import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
 
@@ -336,23 +336,12 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
   }
 
   Future<void> _shareToat() async {
-    final text = _shareText();
-    await Share.share(text, subject: _toat.title);
-  }
-
-  String _shareText() {
-    final buffer = StringBuffer()..writeln(_toat.title);
-    if (_toat.datetime != null) {
-      buffer.writeln(_formatWhen(_toat));
-    }
-    if (_toat.location != null && _toat.location!.isNotEmpty) {
-      buffer.writeln(_toat.location);
-    }
-    if (_toat.notes != null && _toat.notes!.isNotEmpty) {
-      buffer.writeln(_toat.notes);
-    }
-
-    return buffer.toString().trim();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (context) => ShareToatScreen(toat: _toat),
+      ),
+    );
   }
 
   Future<void> _runAction(
