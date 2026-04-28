@@ -96,8 +96,22 @@ class AuthService {
   /// Fetch the current user's profile (and discover handle status) using
   /// the same Bearer-token flow every other authenticated call uses.
   Future<UserProfile> fetchProfile() async {
-    final response = await _api.getJson('/api/auth/me', authenticated: true);
-    return UserProfile.fromJson(response);
+    // ignore: avoid_print
+    print('[fetchProfile] calling GET /api/auth/me');
+    try {
+      final response = await _api.getJson('/api/auth/me', authenticated: true);
+      // ignore: avoid_print
+      print('[fetchProfile] OK handle=${response['handle']}');
+      return UserProfile.fromJson(response);
+    } on ApiServiceException catch (e) {
+      // ignore: avoid_print
+      print('[fetchProfile] FAILED status=${e.statusCode} msg=${e.message}');
+      rethrow;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[fetchProfile] FAILED: $e');
+      rethrow;
+    }
   }
 
   Future<String> saveHandle(String handle) async {

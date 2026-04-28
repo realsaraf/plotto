@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
 
-/// Dark theme — the only theme Toatre supports.
+/// Toatre theme aligned to the current web app surface.
 class ThemeConfig {
   ThemeConfig._();
 
   static ThemeData get darkTheme => ThemeData(
-    brightness: Brightness.dark,
+    brightness: Brightness.light,
     scaffoldBackgroundColor: AppColors.bg,
     fontFamily: TextStyles.fontFamilyInter,
-    colorScheme: const ColorScheme.dark(
+    colorScheme: const ColorScheme.light(
       primary: AppColors.primary,
       onPrimary: Colors.white,
       secondary: AppColors.accent,
@@ -45,11 +45,11 @@ class ThemeConfig {
       fillColor: AppColors.bgElevated,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: const BorderSide(color: AppColors.softBorder),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: const BorderSide(color: AppColors.softBorder),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

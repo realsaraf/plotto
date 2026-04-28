@@ -7,6 +7,7 @@ import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
 import 'package:toatre/ui/auth/login_screen.dart';
 import 'package:toatre/ui/timeline/timeline_screen.dart';
+import 'package:toatre/widgets/toatre_mark.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -80,28 +81,36 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ShaderMask(
-                shaderCallback: (bounds) =>
-                    AppColors.brandGradient.createShader(bounds),
-                blendMode: BlendMode.srcIn,
-                child: Text(
-                  'toatre',
-                  style: TextStyles.display.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -1,
-                    color: Colors.white,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFBFAFF), Color(0xFFF7F5FF), Color(0xFFFBFAFF)],
+            stops: [0, 0.52, 1],
+          ),
+        ),
+        child: Center(
+          child: FadeTransition(
+            opacity: _fadeAnim,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: Image.asset(
+                    'assets/images/icon.png',
+                    width: 86,
+                    height: 86,
+                    fit: BoxFit.cover,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text('your mic-first timeline', style: TextStyles.small),
-            ],
+                const SizedBox(height: 18),
+                const ToatreMark(fontSize: 42),
+                const SizedBox(height: 8),
+                Text('your mic-first timeline', style: TextStyles.small),
+              ],
+            ),
           ),
         ),
       ),

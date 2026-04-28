@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Single source of truth for all brand colours — dark theme only.
+/// Single source of truth for all brand colours.
 ///
 /// Brand gradient: Indigo #4F46E5 → Amber #F59E0B
 /// NEVER hardcode these hex values anywhere else in the codebase.
@@ -27,21 +27,23 @@ class AppColors {
   static const Color accentLight = Color(0xFFFBBF24);
 
   // ── Backgrounds ─────────────────────────────────────────────────────────
-  static const Color bg = Color(0xFF0A0A0F);
+  static const Color bg = Color(0xFFFBFAFF);
   static const Color bgPrimary = bg;
-  static const Color bgElevated = Color(0xFF13131A);
+  static const Color bgElevated = Color(0xF2FFFFFF);
   static const Color bgSecondary = bgElevated;
-  static const Color card = Color(0xB313131A); // 70% opacity
-  static const Color glass = Color(0x9913131A); // 60% opacity
+  static const Color card = Color(0xEFFFFFFF);
+  static const Color glass = Color(0xD9FFFFFF);
 
   // ── Text ────────────────────────────────────────────────────────────────
-  static const Color text = Color(0xFFE8EDF5);
+  static const Color text = Color(0xFF111827);
   static const Color textPrimary = text;
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textMuted = Color(0xFF6B7A94);
+  static const Color textSecondary = Color(0xFF4B5563);
+  static const Color textMuted = Color(0xFF6B7280);
 
   // ── Border ──────────────────────────────────────────────────────────────
-  static const Color border = Color(0x1A949BA8);
+  static const Color border = Color(0xE6FFFFFF);
+  static const Color softBorder = Color(0xFFE5E7EB);
+  static const Color softPurple = Color(0xFFEDE9FE);
 
   // ── Status ──────────────────────────────────────────────────────────────
   static const Color success = Color(0xFF22C55E);

@@ -117,6 +117,11 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     await _authService.signOut();
     await AnalyticsService.resetUser();
+    _user = null;
+    _handle = null;
+    _errorMessage = null;
+    _status = AuthStatus.unauthenticated;
+    notifyListeners();
   }
 
   Future<void> _onAuthStateChanged(User? user) async {

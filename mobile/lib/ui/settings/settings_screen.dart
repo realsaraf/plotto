@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:toatre/models/user_settings.dart';
 import 'package:toatre/providers/auth_provider.dart';
 import 'package:toatre/providers/settings_provider.dart';
+import 'package:toatre/ui/auth/login_screen.dart';
 import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
 
@@ -38,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _workStart = '09:00';
   String _workEnd = '17:30';
   bool _voiceRetention = false;
+  bool _signingOut = false;
   String _handleDraft = '';
   String _phoneDraft = '';
   String _verificationCode = '';
@@ -79,12 +81,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(child: Text('Settings', style: TextStyles.heading2)),
-                  _IconCircleButton(
-                    icon: Icons.logout_rounded,
-                    onTap: settingsProvider.savingKey == 'signout'
-                        ? null
-                        : () => _signOut(context),
-                  ),
                 ],
               ),
             ),
@@ -100,6 +96,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           auth.user?.displayName,
                       email: payload?.profile.email ?? auth.user?.email,
                       handle: payload?.profile.handle,
+                      signingOut: _signingOut,
+                      onSignOut: () => _signOut(context),
                     ),
                     const SizedBox(height: 16),
                     SingleChildScrollView(
@@ -309,9 +307,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _signOut(BuildContext context) async {
+    if (_signingOut) {
+      return;
+    }
+
+    setState(() => _signingOut = true);
     await context.read<AuthProvider>().signOut();
     if (!context.mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
   }
 
   void _toggleChannel(String kind, String channel) {
@@ -351,11 +357,15 @@ class _HeroCard extends StatelessWidget {
     required this.displayName,
     required this.email,
     required this.handle,
+    required this.signingOut,
+    required this.onSignOut,
   });
 
   final String? displayName;
   final String? email;
   final String? handle;
+  final bool signingOut;
+  final VoidCallback onSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -389,6 +399,42 @@ class _HeroCard extends StatelessWidget {
             'Manage your profile, phone Pings, handle, and privacy in one place.',
             style: TextStyles.smallMedium,
           ),
+          const SizedBox(height: 18),
+          GestureDetector(
+            onTap: signingOut ? null : onSignOut,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0x33EF4444)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (signingOut)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    const Icon(
+                      Icons.logout_rounded,
+                      size: 20,
+                      color: AppColors.error,
+                    ),
+                  const SizedBox(width: 10),
+                  Text(
+                    signingOut ? 'Signing out…' : 'Sign out',
+                    style: TextStyles.bodyMedium.copyWith(
+                      color: AppColors.error,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -413,16 +459,16 @@ class _TabButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFF1B1832) : AppColors.bgElevated,
+          color: active ? AppColors.softPurple : AppColors.bgElevated,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? const Color(0x444F46E5) : AppColors.border,
+            color: active ? const Color(0x335B3DF5) : AppColors.border,
           ),
         ),
         child: Text(
           label,
           style: TextStyles.smallMedium.copyWith(
-            color: active ? AppColors.primaryLight : AppColors.textSecondary,
+            color: active ? AppColors.primary : AppColors.textSecondary,
           ),
         ),
       ),
@@ -744,7 +790,7 @@ class _HandleTab extends StatelessWidget {
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0x121C2540),
+                    color: AppColors.bgElevated,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text('@', style: TextStyles.bodyMedium),
@@ -807,7 +853,7 @@ class _PingsTab extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0x121C2540),
+                color: AppColors.bgElevated,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Column(
@@ -939,7 +985,7 @@ class _ToggleTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0x121C2540),
+        color: AppColors.bgElevated,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -972,7 +1018,7 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: highlighted ? const Color(0x2222C55E) : const Color(0x121C2540),
+        color: highlighted ? const Color(0x2222C55E) : AppColors.bgElevated,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Text(
@@ -1003,16 +1049,16 @@ class _ChannelPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: value ? const Color(0xFF1B1832) : const Color(0x121C2540),
+          color: value ? AppColors.softPurple : AppColors.bgElevated,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: value ? const Color(0x444F46E5) : AppColors.border,
+            color: value ? const Color(0x335B3DF5) : AppColors.border,
           ),
         ),
         child: Text(
           label,
           style: TextStyles.smallMedium.copyWith(
-            color: value ? AppColors.primaryLight : AppColors.textSecondary,
+            color: value ? AppColors.primary : AppColors.textSecondary,
           ),
         ),
       ),

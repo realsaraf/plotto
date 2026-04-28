@@ -14,6 +14,7 @@
 		}
 	],
 	"settings": {
-		"workbench.browser.enableChatTools": true
+		"workbench.browser.enableChatTools": true,
+		"github.copilot.chat.agentDebugLog.fileLogging.enabled": true
 	}
 }

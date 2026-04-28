@@ -141,7 +141,10 @@ class ApiService {
 
     throw ApiServiceException(
       statusCode: response.statusCode,
-      message: map['error'] as String? ?? 'Request failed.',
+      message:
+          map['message'] as String? ??
+          map['error'] as String? ??
+          (response.body.isEmpty ? 'Request failed.' : response.body),
     );
   }
 }

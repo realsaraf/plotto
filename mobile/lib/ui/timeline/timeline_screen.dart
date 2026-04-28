@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:provider/provider.dart';
 
 import 'package:toatre/models/toat_summary.dart';
+import 'package:toatre/providers/auth_provider.dart';
 import 'package:toatre/providers/capture_provider.dart';
 import 'package:toatre/providers/toats_provider.dart';
 import 'package:toatre/services/analytics_service.dart';
@@ -13,6 +15,7 @@ import 'package:toatre/ui/settings/settings_screen.dart';
 import 'package:toatre/ui/toat/toat_detail_screen.dart';
 import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
+import 'package:toatre/widgets/toatre_mark.dart';
 
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key});
@@ -33,6 +36,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     final toatsProvider = context.watch<ToatsProvider>();
     final toats = toatsProvider.toats;
     final grouped = _groupToats(toats);
@@ -40,116 +44,128 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: context.read<ToatsProvider>().fetchToats,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
-            children: [
-              Row(
-                children: [
-                  ShaderMask(
-                    shaderCallback: AppColors.brandGradient.createShader,
-                    blendMode: BlendMode.srcIn,
-                    child: Text(
-                      'toatre',
-                      style: TextStyles.heading2.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFBFAFF), Color(0xFFF7F5FF), Color(0xFFFBFAFF)],
+            stops: [0, 0.52, 1],
+          ),
+        ),
+        child: Stack(
+          children: [
+            const _BackgroundHalo(
+              alignment: Alignment(-1.25, -0.85),
+              color: Color(0x33F9A8D4),
+              size: 260,
+            ),
+            const _BackgroundHalo(
+              alignment: Alignment(1.25, -0.2),
+              color: Color(0x38BFDBFE),
+              size: 300,
+            ),
+            SafeArea(
+              child: RefreshIndicator(
+                onRefresh: context.read<ToatsProvider>().fetchToats,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
+                  children: [
+                    Row(
+                      children: [
+                        const _AppBrand(),
+                        const Spacer(),
+                        _ProfileButton(user: auth.user, onTap: _openSettings),
+                      ],
                     ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: _openSettings,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.bgElevated,
-                      ),
-                      child: const Icon(Icons.person_rounded),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-              Row(
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Today',
-                        style: TextStyles.display.copyWith(fontSize: 40),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _formatToday(),
-                        style: TextStyles.heading3.copyWith(
-                          color: AppColors.textSecondary,
+                    const SizedBox(height: 30),
+                    Row(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Today',
+                              style: TextStyles.display.copyWith(fontSize: 40),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _formatToday(),
+                              style: TextStyles.heading3.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
+                        const Spacer(),
+                        _HeaderIcon(
+                          icon: Icons.calendar_today_outlined,
+                          onTap: () => _openCalendarPicker(grouped),
+                        ),
+                        const SizedBox(width: 12),
+                        _HeaderIcon(
+                          icon: Icons.search_rounded,
+                          onTap: _openSearch,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+                    if (toatsProvider.status == ToatsStatus.loading)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 80),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (toatsProvider.status == ToatsStatus.error)
+                      _TimelineMessage(
+                        title: 'Could not load your timeline.',
+                        subtitle:
+                            toatsProvider.error ?? 'Try pulling to refresh.',
+                      )
+                    else if (toats.isEmpty)
+                      _EmptyState(
+                        onCapture: _openVoiceCapture,
+                        onTextCapture: _openTextCapture,
+                      )
+                    else ...[
+                      if (upNext != null) ...[
+                        _UpNextCard(
+                          toat: upNext,
+                          onTap: () => _openToat(upNext),
+                        ),
+                        const SizedBox(height: 26),
+                      ],
+                      for (final entry in grouped.entries) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 54, bottom: 12),
+                          child: Text(
+                            entry.key,
+                            style: TextStyles.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        ...entry.value.map(
+                          (toat) => _TimelineRow(
+                            toat: toat,
+                            onTap: () => _openToat(toat),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      _TimelineMessage(
+                        title: 'You\'re all clear after ${_latestTime(toats)}',
+                        subtitle: 'Enjoy your evening.',
                       ),
                     ],
-                  ),
-                  const Spacer(),
-                  _HeaderIcon(
-                    icon: Icons.calendar_today_outlined,
-                    onTap: () => _openCalendarPicker(grouped),
-                  ),
-                  const SizedBox(width: 12),
-                  _HeaderIcon(icon: Icons.search_rounded, onTap: _openSearch),
-                ],
-              ),
-              const SizedBox(height: 28),
-              if (toatsProvider.status == ToatsStatus.loading)
-                const Padding(
-                  padding: EdgeInsets.only(top: 80),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (toatsProvider.status == ToatsStatus.error)
-                _TimelineMessage(
-                  title: 'Could not load your timeline.',
-                  subtitle: toatsProvider.error ?? 'Try pulling to refresh.',
-                )
-              else if (toats.isEmpty)
-                _EmptyState(
-                  onCapture: _openVoiceCapture,
-                  onTextCapture: _openTextCapture,
-                )
-              else ...[
-                if (upNext != null) ...[
-                  _UpNextCard(toat: upNext, onTap: () => _openToat(upNext)),
-                  const SizedBox(height: 26),
-                ],
-                for (final entry in grouped.entries) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(left: 54, bottom: 12),
-                    child: Text(
-                      entry.key,
-                      style: TextStyles.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  ...entry.value.map(
-                    (toat) =>
-                        _TimelineRow(toat: toat, onTap: () => _openToat(toat)),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                _TimelineMessage(
-                  title: 'You\'re all clear after ${_latestTime(toats)}',
-                  subtitle: 'Enjoy your evening.',
+                  ],
                 ),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: _MicFab(onTap: _openVoiceCapture),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: Container(
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 18),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -177,7 +193,6 @@ class _TimelineScreenState extends State<TimelineScreen> {
               label: 'Search',
               onTap: _openSearch,
             ),
-            SizedBox(width: 52),
             _BottomItem(
               icon: Icons.people_outline_rounded,
               label: 'People',
@@ -187,6 +202,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
               icon: Icons.inbox_outlined,
               label: 'Inbox',
               onTap: _openInbox,
+            ),
+            _BottomItem(
+              icon: Icons.calendar_today_outlined,
+              label: 'Calendar',
+              onTap: () => _openCalendarPicker(grouped),
             ),
           ],
         ),
@@ -413,6 +433,149 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 }
 
+class _BackgroundHalo extends StatelessWidget {
+  const _BackgroundHalo({
+    required this.alignment,
+    required this.color,
+    required this.size,
+  });
+
+  final Alignment alignment;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: alignment,
+      child: IgnorePointer(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: color, blurRadius: size / 2)],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppBrand extends StatelessWidget {
+  const _AppBrand();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.asset(
+            'assets/images/icon.png',
+            width: 40,
+            height: 40,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(width: 8),
+        const ToatreMark(fontSize: 28),
+      ],
+    );
+  }
+}
+
+class _ProfileButton extends StatelessWidget {
+  const _ProfileButton({required this.user, required this.onTap});
+
+  final User? user;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = user?.photoURL;
+    final displayName = user?.displayName;
+    final email = user?.email;
+    final initials = _initials(displayName, email);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 54,
+        height: 54,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.border),
+          color: AppColors.bgElevated,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1F1F2937),
+              blurRadius: 34,
+              offset: Offset(0, 14),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: photoUrl == null || photoUrl.isEmpty
+            ? DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: TextStyles.bodyMedium.copyWith(color: Colors.white),
+                  ),
+                ),
+              )
+            : Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => DecoratedBox(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      initials,
+                      style: TextStyles.bodyMedium.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  String _initials(String? displayName, String? email) {
+    final name = displayName?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name
+          .split(RegExp(r'\s+'))
+          .where((part) => part.isNotEmpty)
+          .map((part) => part[0])
+          .take(2)
+          .join()
+          .toUpperCase();
+    }
+    final firstEmailCharacter = email?.trim().isNotEmpty == true
+        ? email!.trim()[0]
+        : 'T';
+    return firstEmailCharacter.toUpperCase();
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onCapture, required this.onTextCapture});
 
@@ -517,21 +680,24 @@ class _MicFab extends StatelessWidget {
         width: 82,
         height: 82,
         decoration: const BoxDecoration(
-          gradient: AppColors.brandGradient,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Color(0x554F46E5),
-              blurRadius: 20,
-              offset: Offset(0, 6),
+              color: Color(0x477C3AED),
+              blurRadius: 34,
+              offset: Offset(0, 18),
             ),
           ],
         ),
-        child: const Icon(
-          Icons.mic_rounded,
-          color: Colors.white,
-          size: 36,
-          semanticLabel: 'Capture a toat',
+        child: Semantics(
+          label: 'Capture a toat',
+          button: true,
+          child: Image.asset(
+            'assets/images/micicon.png',
+            width: 82,
+            height: 82,
+            fit: BoxFit.cover,
+          ),
         ),
       ),
     );

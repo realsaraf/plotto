@@ -22,7 +22,7 @@ class TextStyles {
     fontSize: sizeDisplay,
     fontWeight: FontWeight.w700,
     color: AppColors.text,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   );
 
   static TextStyle get heading1 => const TextStyle(
@@ -30,7 +30,7 @@ class TextStyles {
     fontSize: sizeH1,
     fontWeight: FontWeight.w700,
     color: AppColors.text,
-    letterSpacing: -0.3,
+    letterSpacing: 0,
   );
 
   static TextStyle get heading2 => const TextStyle(
