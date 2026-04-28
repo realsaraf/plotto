@@ -52,6 +52,15 @@ interface ToatDetail {
   updatedAt: string;
 }
 
+interface SavedConnection {
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string | null;
+  email: string | null;
+  handle: string | null;
+}
+
 interface ActionConfig {
   label: string;
   href: string;
@@ -383,6 +392,11 @@ export default function ToatDetailPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState<number | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareBusy, setShareBusy] = useState<string | null>(null);
+  const [sharePermission, setSharePermission] = useState<"view" | "edit">("view");
+  const [shareConnections, setShareConnections] = useState<SavedConnection[]>([]);
+  const [selectedConnectionIds, setSelectedConnectionIds] = useState<string[]>([]);
 
   const now = new Date();
 
@@ -525,16 +539,71 @@ export default function ToatDetailPage() {
     router.push(`/toats/${data.toat.id}`);
   };
 
-  const shareToat = async () => {
-    if (!toat) return;
-    const shareUrl = `${window.location.origin}/toats/${toat.id}`;
-    if (navigator.share) {
-      await navigator.share({ title: toat.title, text: toat.title, url: shareUrl });
-      return;
+  const openShareModal = async () => {
+    if (!user || !toat) return;
+    setShareOpen(true);
+    setShareBusy("load");
+    setFlash(null);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/connections", { headers: { Authorization: `Bearer ${token}` } });
+      const data = (await response.json().catch(() => null)) as { connections?: SavedConnection[]; error?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Could not load your connections.");
+      }
+      const nextConnections = data?.connections ?? [];
+      setShareConnections(nextConnections);
+      setSelectedConnectionIds(nextConnections.slice(0, 2).map((connection) => connection.id));
+    } catch (err) {
+      setFlash(err instanceof Error ? err.message : "Could not open sharing.");
+    } finally {
+      setShareBusy(null);
     }
+  };
 
-    await navigator.clipboard.writeText(shareUrl);
-    setFlash("Link copied.");
+  const createShare = async (linkOnly: boolean) => {
+    if (!user || !toat) return;
+    setShareBusy(linkOnly ? "link" : "send");
+    setFlash(null);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/toats/${toat.id}/share`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          connectionIds: linkOnly ? [] : selectedConnectionIds,
+          permission: sharePermission,
+          linkOnly,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as { shareUrl?: string; error?: string } | null;
+      if (!response.ok || !data?.shareUrl) {
+        throw new Error(data?.error ?? "Could not create that share link.");
+      }
+
+      if (navigator.share) {
+        await navigator.share({ title: toat.title, text: toat.title, url: data.shareUrl });
+      } else {
+        await navigator.clipboard.writeText(data.shareUrl);
+      }
+      setFlash(linkOnly ? "Share link ready." : "Share invite ready.");
+      setShareOpen(false);
+    } catch (err) {
+      setFlash(err instanceof Error ? err.message : "Could not share this toat.");
+    } finally {
+      setShareBusy(null);
+    }
+  };
+
+  const toggleShareConnection = (connectionId: string) => {
+    setSelectedConnectionIds((current) => (
+      current.includes(connectionId)
+        ? current.filter((id) => id !== connectionId)
+        : [...current, connectionId]
+    ));
   };
 
   const openPrimaryAction = () => {
@@ -609,7 +678,7 @@ export default function ToatDetailPage() {
 
           <div style={{ ...styles.topBarRight, ...(isPhoneViewport ? styles.topBarRightCompact : {}) }}>
             <UserAvatar user={user} />
-            <CircleIconButton label="Share" onClick={() => void shareToat()}>
+            <CircleIconButton label="Share" onClick={() => void openShareModal()}>
               <ShareIcon size={isPhoneViewport ? 20 : 24} />
             </CircleIconButton>
             <div style={{ position: "relative" }}>
@@ -703,7 +772,7 @@ export default function ToatDetailPage() {
                       window.open(`tel:${phone.replace(/\s+/g, "")}`, "_self");
                       return;
                     }
-                    void shareToat();
+                    void openShareModal();
                   }}
                   style={styles.secondaryButton}
                 >
@@ -947,6 +1016,105 @@ export default function ToatDetailPage() {
 
         <div style={{ height: 40 }} />
       </main>
+
+      {shareOpen ? (
+        <ShareToatModal
+          toat={toat}
+          connections={shareConnections}
+          selectedConnectionIds={selectedConnectionIds}
+          permission={sharePermission}
+          busy={shareBusy}
+          onClose={() => setShareOpen(false)}
+          onToggleConnection={toggleShareConnection}
+          onPermissionChange={setSharePermission}
+          onCreateLink={() => void createShare(true)}
+          onSend={() => void createShare(false)}
+          onOpenConnections={() => router.push("/settings")}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ShareToatModal({
+  toat,
+  connections,
+  selectedConnectionIds,
+  permission,
+  busy,
+  onClose,
+  onToggleConnection,
+  onPermissionChange,
+  onCreateLink,
+  onSend,
+  onOpenConnections,
+}: {
+  toat: ToatDetail;
+  connections: SavedConnection[];
+  selectedConnectionIds: string[];
+  permission: "view" | "edit";
+  busy: string | null;
+  onClose: () => void;
+  onToggleConnection: (connectionId: string) => void;
+  onPermissionChange: (permission: "view" | "edit") => void;
+  onCreateLink: () => void;
+  onSend: () => void;
+  onOpenConnections: () => void;
+}) {
+  return (
+    <div style={styles.shareOverlay}>
+      <section style={styles.shareSheet}>
+        <div style={styles.shareSheetHandle} />
+        <div style={styles.shareHeader}>
+          <div>
+            <p style={styles.shareEyebrow}>Share toat</p>
+            <h2 style={styles.shareTitle}>Choose connections</h2>
+          </div>
+          <button type="button" onClick={onClose} style={styles.shareCloseButton}>×</button>
+        </div>
+
+        <article style={styles.sharePreviewCard}>
+          <div style={styles.sharePreviewIcon}><ShareIcon size={22} /></div>
+          <div style={{ minWidth: 0 }}>
+            <p style={styles.sharePreviewTitle}>{toat.title}</p>
+            <p style={styles.sharePreviewMeta}>{toat.datetime ? new Date(toat.datetime).toLocaleString() : "No time set"}</p>
+          </div>
+        </article>
+
+        <div style={styles.sharePeopleGrid}>
+          {busy === "load" ? <p style={styles.shareHelper}>Loading connections…</p> : null}
+          {!busy && !connections.length ? (
+            <button type="button" onClick={onOpenConnections} style={styles.shareEmptyButton}>Add connections in Settings</button>
+          ) : null}
+          {connections.map((connection) => {
+            const selected = selectedConnectionIds.includes(connection.id);
+            return (
+              <button
+                key={connection.id}
+                type="button"
+                onClick={() => onToggleConnection(connection.id)}
+                style={{ ...styles.sharePersonButton, ...(selected ? styles.sharePersonButtonSelected : {}) }}
+              >
+                <span style={styles.sharePersonAvatar}>{initials(connection.name)}</span>
+                <span style={styles.sharePersonName}>{connection.name}</span>
+                <span style={styles.sharePersonRelationship}>{connection.relationship}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={styles.sharePermissionRow}>
+          <button type="button" onClick={() => onPermissionChange("view")} style={{ ...styles.sharePermissionButton, ...(permission === "view" ? styles.sharePermissionButtonActive : {}) }}>View only</button>
+          <button type="button" onClick={() => onPermissionChange("edit")} style={{ ...styles.sharePermissionButton, ...(permission === "edit" ? styles.sharePermissionButtonActive : {}) }}>Can edit</button>
+        </div>
+
+        <button type="button" onClick={onCreateLink} style={styles.secondaryButton} disabled={Boolean(busy)}>
+          {busy === "link" ? "Creating link…" : "Create share link"}
+        </button>
+        <button type="button" onClick={onSend} style={styles.primaryButton} disabled={Boolean(busy) || selectedConnectionIds.length === 0}>
+          {busy === "send" ? "Sending…" : "Send invite"}
+        </button>
+      </section>
     </div>
   );
 }
@@ -1212,6 +1380,187 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#5B3DF5",
     fontSize: 16,
     fontWeight: 700,
+  },
+  shareOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 40,
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    background: "rgba(17,24,39,0.34)",
+    padding: 12,
+  },
+  shareSheet: {
+    width: "min(100%, 560px)",
+    maxHeight: "92vh",
+    overflowY: "auto",
+    borderRadius: 30,
+    background: "#FFFFFF",
+    border: "1px solid rgba(229,231,235,0.92)",
+    boxShadow: "0 28px 90px rgba(17,24,39,0.22)",
+    padding: 18,
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+  },
+  shareSheetHandle: {
+    alignSelf: "center",
+    width: 52,
+    height: 5,
+    borderRadius: 99,
+    background: "#D1D5DB",
+    marginBottom: 4,
+  },
+  shareHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 14,
+  },
+  shareEyebrow: {
+    margin: 0,
+    fontSize: 12,
+    fontWeight: 850,
+    letterSpacing: 0,
+    color: "#5B3DF5",
+    textTransform: "uppercase",
+  },
+  shareTitle: {
+    margin: "4px 0 0",
+    fontSize: 26,
+    lineHeight: 1.08,
+    color: "#111827",
+  },
+  shareCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    border: "1px solid rgba(107,114,128,0.16)",
+    background: "rgba(249,250,251,0.92)",
+    color: "#374151",
+    fontSize: 26,
+    lineHeight: 1,
+    cursor: "pointer",
+  },
+  sharePreviewCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 20,
+    background: "#F8F7FF",
+    border: "1px solid #ECE9FF",
+  },
+  sharePreviewIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    display: "grid",
+    placeItems: "center",
+    background: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
+    color: "#FFFFFF",
+  },
+  sharePreviewTitle: {
+    margin: 0,
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: 850,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  sharePreviewMeta: {
+    margin: "4px 0 0",
+    color: "#6B7280",
+    fontSize: 12,
+  },
+  sharePeopleGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(104px, 1fr))",
+    gap: 10,
+  },
+  sharePersonButton: {
+    display: "flex",
+    minHeight: 112,
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 18,
+    border: "1px solid #E5E7EB",
+    background: "#FFFFFF",
+    color: "#111827",
+    cursor: "pointer",
+  },
+  sharePersonButtonSelected: {
+    borderColor: "#5B3DF5",
+    background: "#F4F0FF",
+  },
+  sharePersonAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    display: "grid",
+    placeItems: "center",
+    background: "linear-gradient(135deg, #EC4899, #F59E0B)",
+    color: "#FFFFFF",
+    fontWeight: 900,
+    fontSize: 13,
+  },
+  sharePersonName: {
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontSize: 13,
+    fontWeight: 850,
+  },
+  sharePersonRelationship: {
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontSize: 11,
+    color: "#6B7280",
+  },
+  shareEmptyButton: {
+    gridColumn: "1 / -1",
+    minHeight: 80,
+    borderRadius: 18,
+    border: "1px dashed rgba(91,61,245,0.35)",
+    background: "#F8F7FF",
+    color: "#5B3DF5",
+    fontWeight: 850,
+    cursor: "pointer",
+  },
+  shareHelper: {
+    gridColumn: "1 / -1",
+    margin: 0,
+    color: "#6B7280",
+    fontSize: 14,
+  },
+  sharePermissionRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+    padding: 6,
+    borderRadius: 18,
+    background: "#F3F4F6",
+  },
+  sharePermissionButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    border: "none",
+    background: "transparent",
+    color: "#6B7280",
+    fontWeight: 850,
+    cursor: "pointer",
+  },
+  sharePermissionButtonActive: {
+    background: "#FFFFFF",
+    color: "#5B3DF5",
+    boxShadow: "0 8px 22px rgba(17,24,39,0.08)",
   },
   fullWidthPrimary: {
     width: "100%",

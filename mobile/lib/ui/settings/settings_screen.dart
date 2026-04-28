@@ -4,14 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:toatre/models/connection.dart';
 import 'package:toatre/models/user_settings.dart';
 import 'package:toatre/providers/auth_provider.dart';
 import 'package:toatre/providers/settings_provider.dart';
+import 'package:toatre/providers/share_provider.dart';
 import 'package:toatre/ui/auth/login_screen.dart';
 import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
 
-enum SettingsTab { general, pings, sync }
+enum SettingsTab { general, connections, pings, sync }
 
 enum _NoticeTone { success, error }
 
@@ -50,18 +52,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
       createDefaultNotificationPreferences();
   SyncConnections _syncConnections = <String, SyncConnection>{};
   SyncDirection _googleCalendarDirection = SyncDirection.sourceToToatre;
+  String? _editingConnectionId;
+  String _connectionName = '';
+  String _connectionRelationship = '';
+  String _connectionPhone = '';
+  String _connectionEmail = '';
+  String _connectionHandle = '';
+  String _connectionNotes = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SettingsProvider>().loadSettings();
+      context.read<ShareProvider>().loadConnections();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final settingsProvider = context.watch<SettingsProvider>();
+    final shareProvider = context.watch<ShareProvider>();
     final auth = context.watch<AuthProvider>();
     final payload = settingsProvider.payload;
 
@@ -196,6 +207,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           busy: settingsProvider.savingKey == 'pings',
                           onToggle: _toggleChannel,
                           onSave: () => _savePings(settingsProvider),
+                        ),
+                      if (_activeTab == SettingsTab.connections)
+                        _ConnectionsTab(
+                          connections: shareProvider.connections,
+                          loading: shareProvider.loading,
+                          busy: shareProvider.saving,
+                          editingId: _editingConnectionId,
+                          name: _connectionName,
+                          relationship: _connectionRelationship,
+                          phone: _connectionPhone,
+                          email: _connectionEmail,
+                          handle: _connectionHandle,
+                          notes: _connectionNotes,
+                          onNameChanged: (value) =>
+                              setState(() => _connectionName = value),
+                          onRelationshipChanged: (value) =>
+                              setState(() => _connectionRelationship = value),
+                          onPhoneChanged: (value) =>
+                              setState(() => _connectionPhone = value),
+                          onEmailChanged: (value) =>
+                              setState(() => _connectionEmail = value),
+                          onHandleChanged: (value) =>
+                              setState(() => _connectionHandle = value),
+                          onNotesChanged: (value) =>
+                              setState(() => _connectionNotes = value),
+                          onEdit: _editConnection,
+                          onDelete: (id) =>
+                              _deleteConnection(shareProvider, id),
+                          onCancel: _resetConnectionDraft,
+                          onSave: () => _saveConnection(shareProvider),
                         ),
                       if (_activeTab == SettingsTab.sync)
                         _SyncTab(
@@ -417,10 +458,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
     switch (tab) {
       case SettingsTab.general:
         return 'General';
+      case SettingsTab.connections:
+        return 'Connections';
       case SettingsTab.pings:
         return 'Pings';
       case SettingsTab.sync:
         return 'Sync';
+    }
+  }
+
+  void _editConnection(ToatreConnection connection) {
+    setState(() {
+      _editingConnectionId = connection.id;
+      _connectionName = connection.name;
+      _connectionRelationship = connection.relationship;
+      _connectionPhone = connection.phone ?? '';
+      _connectionEmail = connection.email ?? '';
+      _connectionHandle = connection.handle ?? '';
+      _connectionNotes = connection.notes ?? '';
+    });
+  }
+
+  void _resetConnectionDraft() {
+    setState(() {
+      _editingConnectionId = null;
+      _connectionName = '';
+      _connectionRelationship = '';
+      _connectionPhone = '';
+      _connectionEmail = '';
+      _connectionHandle = '';
+      _connectionNotes = '';
+    });
+  }
+
+  Future<void> _saveConnection(ShareProvider provider) async {
+    try {
+      await provider.saveConnection(
+        id: _editingConnectionId,
+        name: _connectionName,
+        relationship: _connectionRelationship,
+        phone: _connectionPhone,
+        email: _connectionEmail,
+        handle: _connectionHandle,
+        notes: _connectionNotes,
+      );
+      _resetConnectionDraft();
+      _showNotice('Connection saved.', _NoticeTone.success);
+    } catch (_) {
+      _showNotice(
+        provider.error ?? 'Could not save that connection.',
+        _NoticeTone.error,
+      );
+    }
+  }
+
+  Future<void> _deleteConnection(ShareProvider provider, String id) async {
+    try {
+      await provider.deleteConnection(id);
+      if (_editingConnectionId == id) {
+        _resetConnectionDraft();
+      }
+      _showNotice('Connection removed.', _NoticeTone.success);
+    } catch (_) {
+      _showNotice(
+        provider.error ?? 'Could not remove that connection.',
+        _NoticeTone.error,
+      );
     }
   }
 }
@@ -894,6 +997,246 @@ class _HandleTab extends StatelessWidget {
               onPressed: busy ? null : onSave,
               child: Text(busy ? 'Saving…' : 'Save handle'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConnectionsTab extends StatelessWidget {
+  const _ConnectionsTab({
+    required this.connections,
+    required this.loading,
+    required this.busy,
+    required this.editingId,
+    required this.name,
+    required this.relationship,
+    required this.phone,
+    required this.email,
+    required this.handle,
+    required this.notes,
+    required this.onNameChanged,
+    required this.onRelationshipChanged,
+    required this.onPhoneChanged,
+    required this.onEmailChanged,
+    required this.onHandleChanged,
+    required this.onNotesChanged,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onCancel,
+    required this.onSave,
+  });
+
+  final List<ToatreConnection> connections;
+  final bool loading;
+  final bool busy;
+  final String? editingId;
+  final String name;
+  final String relationship;
+  final String phone;
+  final String email;
+  final String handle;
+  final String notes;
+  final ValueChanged<String> onNameChanged;
+  final ValueChanged<String> onRelationshipChanged;
+  final ValueChanged<String> onPhoneChanged;
+  final ValueChanged<String> onEmailChanged;
+  final ValueChanged<String> onHandleChanged;
+  final ValueChanged<String> onNotesChanged;
+  final ValueChanged<ToatreConnection> onEdit;
+  final ValueChanged<String> onDelete;
+  final VoidCallback onCancel;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PanelCard(
+      title: 'People Toatre should know',
+      eyebrow: 'Connections',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Connections power sharing and help capture understand phrases like “call mom” with the right name and phone number.',
+            style: TextStyles.body.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          if (loading)
+            const Center(child: CircularProgressIndicator())
+          else if (connections.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.bgElevated,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Text('No connections yet.', style: TextStyles.bodyMedium),
+            )
+          else
+            for (final connection in connections) ...[
+              _ConnectionTile(
+                connection: connection,
+                onEdit: () => onEdit(connection),
+                onDelete: () => onDelete(connection.id),
+              ),
+              const SizedBox(height: 10),
+            ],
+          const SizedBox(height: 12),
+          Text(
+            editingId == null ? 'Add connection' : 'Update connection',
+            style: TextStyles.heading3,
+          ),
+          const SizedBox(height: 14),
+          _FieldLabel(
+            label: 'Name',
+            child: TextField(
+              onChanged: onNameChanged,
+              controller: TextEditingController(text: name)
+                ..selection = TextSelection.collapsed(offset: name.length),
+              decoration: const InputDecoration(hintText: 'Amina Rahman'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldLabel(
+            label: 'Relationship',
+            child: TextField(
+              onChanged: onRelationshipChanged,
+              controller: TextEditingController(text: relationship)
+                ..selection = TextSelection.collapsed(
+                  offset: relationship.length,
+                ),
+              decoration: const InputDecoration(hintText: 'mom'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldLabel(
+            label: 'Phone',
+            child: TextField(
+              onChanged: onPhoneChanged,
+              controller: TextEditingController(text: phone)
+                ..selection = TextSelection.collapsed(offset: phone.length),
+              decoration: const InputDecoration(hintText: '+15551234567'),
+              keyboardType: TextInputType.phone,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldLabel(
+            label: 'Email',
+            child: TextField(
+              onChanged: onEmailChanged,
+              controller: TextEditingController(text: email)
+                ..selection = TextSelection.collapsed(offset: email.length),
+              decoration: const InputDecoration(hintText: 'name@example.com'),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldLabel(
+            label: 'Handle',
+            child: TextField(
+              onChanged: onHandleChanged,
+              controller: TextEditingController(text: handle)
+                ..selection = TextSelection.collapsed(offset: handle.length),
+              decoration: const InputDecoration(hintText: 'handle'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldLabel(
+            label: 'Notes',
+            child: TextField(
+              onChanged: onNotesChanged,
+              controller: TextEditingController(text: notes)
+                ..selection = TextSelection.collapsed(offset: notes.length),
+              decoration: const InputDecoration(
+                hintText: 'Nickname or calling context',
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: busy ? null : onSave,
+              child: Text(
+                busy
+                    ? 'Saving…'
+                    : editingId == null
+                    ? 'Add connection'
+                    : 'Save connection',
+              ),
+            ),
+          ),
+          if (editingId != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onCancel,
+                child: const Text('Cancel edit'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ConnectionTile extends StatelessWidget {
+  const _ConnectionTile({
+    required this.connection,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final ToatreConnection connection;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgElevated,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: AppColors.primary,
+            child: Text(
+              connection.name.characters.take(2).toString().toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(connection.name, style: TextStyles.bodyMedium),
+                Text(
+                  [
+                    connection.relationship,
+                    if (connection.phone != null) connection.phone!,
+                  ].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyles.small,
+                ),
+              ],
+            ),
+          ),
+          IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
           ),
         ],
       ),

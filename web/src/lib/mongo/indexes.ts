@@ -11,7 +11,7 @@ export async function ensureIndexes(): Promise<void> {
   if (ensured) return;
   ensured = true;
 
-  const { users, toats, captures, people, acl, settings, reminders, calendarSyncTokens, calendarSyncStates } =
+  const { users, toats, captures, people, connections, acl, settings, reminders, calendarSyncTokens, calendarSyncStates } =
     await getCollections();
 
   // users
@@ -37,10 +37,16 @@ export async function ensureIndexes(): Promise<void> {
   await people.createIndex({ userId: 1 });
   await people.createIndex({ userId: 1, handle: 1 }, { sparse: true });
 
+  // connections
+  await connections.createIndex({ ownerId: 1, relationship: 1 });
+  await connections.createIndex({ ownerId: 1, name: 1 });
+  await connections.createIndex({ ownerId: 1, handle: 1 }, { sparse: true });
+
   // acl (share tokens)
   await acl.createIndex({ toatId: 1 });
   await acl.createIndex({ token: 1 }, { unique: true });
   await acl.createIndex({ ownerId: 1 });
+  await acl.createIndex({ ownerId: 1, connectionId: 1 }, { sparse: true });
 
   // settings
   await settings.createIndex({ userId: 1 }, { unique: true });

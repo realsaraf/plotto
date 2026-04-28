@@ -37,6 +37,13 @@
 - Repaired the affected Mongo settings record, manually ran the Google Calendar sync job, and confirmed the Apr 28 Google-origin toat imported
 - Validation: `npm run typecheck`, `npm run build`, VS Code Problems check for touched Settings API file
 
+### Session 2026-04-28 (Connections-backed sharing) — completed
+- Added owner-scoped Connections with CRUD APIs, Mongo indexes, web Settings UI, and mobile Settings UI so share targets come from trusted saved people instead of extracted toat text
+- Added Connections context to capture extraction so relationship phrases like “call mom” can include saved names, phone numbers, handles, and notes in the LLM prompt
+- Replaced the no-op share path with a real share endpoint, ACL records, public `/j/[token]` shared-toat preview page, web share modal, and mobile share screen backed by Connections
+- Local smoke test: Settings → Connections loads, toat detail Share opens, and Create share link returns “Share link ready” on localhost
+- Validation: `npm run typecheck`, `npm run build`, `flutter analyze`, `flutter test`, VS Code Problems check for touched web/mobile paths
+
 ### Session 2026-04-27 (settings sync surface) — completed
 - Added a Settings → Sync tab on mobile and web, starting with Google Calendar as the active provider plus placeholders for iOS Calendar and Office 365
 - Collapsed settings navigation to three tabs on both mobile and web: General, Pings, and Sync; Handle and Phone settings now live inside General

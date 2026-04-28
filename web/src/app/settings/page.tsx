@@ -16,7 +16,7 @@ import { TOAT_KINDS, type NotificationPreferences } from "@/lib/settings/default
 import { useAuth } from "@/lib/auth/auth-context";
 import type { ToatKind } from "@/types";
 
-type SettingsTab = "profile" | "pings" | "sync";
+type SettingsTab = "profile" | "connections" | "pings" | "sync";
 type NoticeTone = "idle" | "success" | "error";
 type SyncDirection = "sourceToToatre" | "toatreToSource" | "twoWay";
 
@@ -52,11 +52,42 @@ interface SettingsResponse {
   };
 }
 
+interface SavedConnection {
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string | null;
+  email: string | null;
+  handle: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ConnectionDraft {
+  name: string;
+  relationship: string;
+  phone: string;
+  email: string;
+  handle: string;
+  notes: string;
+}
+
 const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: "profile", label: "General" },
+  { id: "connections", label: "Connections" },
   { id: "pings", label: "Pings" },
   { id: "sync", label: "Sync" },
 ];
+
+const EMPTY_CONNECTION_DRAFT: ConnectionDraft = {
+  name: "",
+  relationship: "",
+  phone: "",
+  email: "",
+  handle: "",
+  notes: "",
+};
 
 const KIND_LABELS: Record<ToatKind, string> = {
   task: "Tasks",
@@ -148,6 +179,9 @@ export default function SettingsPage() {
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(null);
   const [syncConnections, setSyncConnections] = useState<Record<string, SyncConnection>>({});
   const [googleCalendarDirection, setGoogleCalendarDirection] = useState<SyncDirection>("sourceToToatre");
+  const [connections, setConnections] = useState<SavedConnection[]>([]);
+  const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft>(EMPTY_CONNECTION_DRAFT);
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(null);
 
   const timezoneOptions = useMemo(() => getTimezoneOptions(timezone || Intl.DateTimeFormat().resolvedOptions().timeZone), [timezone]);
 
@@ -224,6 +258,24 @@ export default function SettingsPage() {
     }
   }, [applySettingsPayload, authorizedFetch, user]);
 
+  const loadConnections = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    try {
+      const response = await authorizedFetch("/api/connections", { method: "GET" });
+      const data = await readJsonResponse<{ connections?: SavedConnection[]; error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Couldn't load your connections.");
+      }
+      setConnections(data?.connections ?? []);
+    } catch (error) {
+      console.error("[settings/connections/load]", error);
+      setNotice({ tone: "error", message: error instanceof Error ? error.message : "Couldn't load your connections." });
+    }
+  }, [authorizedFetch, user]);
+
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/login");
@@ -236,7 +288,8 @@ export default function SettingsPage() {
     }
 
     void loadSettings();
-  }, [loadSettings, user]);
+    void loadConnections();
+  }, [loadConnections, loadSettings, user]);
 
   const setSuccess = (message: string) => setNotice({ tone: "success", message });
   const setError = (message: string) => setNotice({ tone: "error", message });
@@ -389,6 +442,65 @@ export default function SettingsPage() {
       setSavingKey(null);
     }
   }, [applySettingsPayload, authorizedFetch, notificationPreferences]);
+
+  const resetConnectionDraft = useCallback(() => {
+    setConnectionDraft(EMPTY_CONNECTION_DRAFT);
+    setEditingConnectionId(null);
+  }, []);
+
+  const editConnection = useCallback((connection: SavedConnection) => {
+    setConnectionDraft({
+      name: connection.name,
+      relationship: connection.relationship,
+      phone: connection.phone ?? "",
+      email: connection.email ?? "",
+      handle: connection.handle ?? "",
+      notes: connection.notes ?? "",
+    });
+    setEditingConnectionId(connection.id);
+  }, []);
+
+  const saveConnection = useCallback(async () => {
+    setSavingKey("connection-save");
+    try {
+      const body = JSON.stringify(connectionDraft);
+      const response = await authorizedFetch(
+        editingConnectionId ? `/api/connections/${editingConnectionId}` : "/api/connections",
+        { method: editingConnectionId ? "PATCH" : "POST", body },
+      );
+      const data = await readJsonResponse<{ connection?: SavedConnection; error?: string }>(response);
+      if (!response.ok || !data?.connection) {
+        throw new Error(data?.error ?? "Couldn't save that connection.");
+      }
+      await loadConnections();
+      resetConnectionDraft();
+      setSuccess(editingConnectionId ? "Connection updated." : "Connection added.");
+    } catch (error) {
+      console.error("[settings/connections/save]", error);
+      setError(error instanceof Error ? error.message : "Couldn't save that connection.");
+    } finally {
+      setSavingKey(null);
+    }
+  }, [authorizedFetch, connectionDraft, editingConnectionId, loadConnections, resetConnectionDraft]);
+
+  const deleteConnection = useCallback(async (connectionId: string) => {
+    setSavingKey(`connection-delete-${connectionId}`);
+    try {
+      const response = await authorizedFetch(`/api/connections/${connectionId}`, { method: "DELETE" });
+      const data = await readJsonResponse<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Couldn't remove that connection.");
+      }
+      await loadConnections();
+      if (editingConnectionId === connectionId) resetConnectionDraft();
+      setSuccess("Connection removed.");
+    } catch (error) {
+      console.error("[settings/connections/delete]", error);
+      setError(error instanceof Error ? error.message : "Couldn't remove that connection.");
+    } finally {
+      setSavingKey(null);
+    }
+  }, [authorizedFetch, editingConnectionId, loadConnections, resetConnectionDraft]);
 
   const connectGoogleCalendar = useCallback(async () => {
     if (!user) {
@@ -712,6 +824,83 @@ export default function SettingsPage() {
             <button type="button" onClick={() => void savePhoneSettings()} style={styles.primaryButton} disabled={savingKey === "phone-save"}>
               {savingKey === "phone-save" ? "Saving…" : "Save phone settings"}
             </button>
+          </section>
+        ) : null}
+
+        {!loadingState && settingsData && activeTab === "connections" ? (
+          <section style={styles.panelCard}>
+            <div style={styles.sectionHead}>
+              <div>
+                <p style={styles.sectionEyebrow}>Connections</p>
+                <h2 style={styles.sectionTitle}>People Toatre should know</h2>
+              </div>
+            </div>
+
+            <p style={styles.helperText}>
+              Saved connections power sharing and help capture understand phrases like “call mom” with the right name and phone number.
+            </p>
+
+            <div style={styles.connectionList}>
+              {connections.length ? connections.map((connection) => (
+                <article key={connection.id} style={styles.connectionCard}>
+                  <div style={styles.connectionAvatar}>{connection.name.slice(0, 2).toUpperCase()}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={styles.connectionName}>{connection.name}</p>
+                    <p style={styles.connectionMeta}>{connection.relationship}{connection.phone ? ` · ${connection.phone}` : ""}</p>
+                    {connection.handle ? <p style={styles.connectionMeta}>@{connection.handle}</p> : null}
+                  </div>
+                  <button type="button" onClick={() => editConnection(connection)} style={styles.smallGhostButton}>Edit</button>
+                  <button type="button" onClick={() => void deleteConnection(connection.id)} style={styles.smallDangerButton} disabled={savingKey === `connection-delete-${connection.id}`}>
+                    {savingKey === `connection-delete-${connection.id}` ? "…" : "Remove"}
+                  </button>
+                </article>
+              )) : (
+                <div style={styles.emptyConnectionCard}>No connections yet. Add close family or collaborators first.</div>
+              )}
+            </div>
+
+            <div style={styles.sectionDivider} />
+
+            <div style={styles.sectionHead}>
+              <div>
+                <p style={styles.sectionEyebrow}>{editingConnectionId ? "Edit" : "Invite"}</p>
+                <h2 style={styles.sectionTitle}>{editingConnectionId ? "Update connection" : "Add a connection"}</h2>
+              </div>
+            </div>
+
+            <div style={styles.formGrid}>
+              <label style={styles.fieldLabel}>
+                Name
+                <input value={connectionDraft.name} onChange={(event) => setConnectionDraft((draft) => ({ ...draft, name: event.target.value }))} style={styles.textInput} placeholder="Amina Rahman" />
+              </label>
+              <label style={styles.fieldLabel}>
+                Relationship
+                <input value={connectionDraft.relationship} onChange={(event) => setConnectionDraft((draft) => ({ ...draft, relationship: event.target.value }))} style={styles.textInput} placeholder="mom" />
+              </label>
+              <label style={styles.fieldLabel}>
+                Phone
+                <input value={connectionDraft.phone} onChange={(event) => setConnectionDraft((draft) => ({ ...draft, phone: event.target.value }))} style={styles.textInput} placeholder="+15551234567" />
+              </label>
+              <label style={styles.fieldLabel}>
+                Email
+                <input value={connectionDraft.email} onChange={(event) => setConnectionDraft((draft) => ({ ...draft, email: event.target.value }))} style={styles.textInput} placeholder="name@example.com" />
+              </label>
+              <label style={styles.fieldLabel}>
+                Handle
+                <input value={connectionDraft.handle} onChange={(event) => setConnectionDraft((draft) => ({ ...draft, handle: event.target.value.replace(/^@+/, "") }))} style={styles.textInput} placeholder="handle" />
+              </label>
+              <label style={styles.fieldLabel}>
+                Notes
+                <input value={connectionDraft.notes} onChange={(event) => setConnectionDraft((draft) => ({ ...draft, notes: event.target.value }))} style={styles.textInput} placeholder="Best time to call, nickname, context" />
+              </label>
+            </div>
+
+            <div style={styles.inlineActions}>
+              <button type="button" onClick={() => void saveConnection()} style={styles.primaryButton} disabled={savingKey === "connection-save"}>
+                {savingKey === "connection-save" ? "Saving…" : editingConnectionId ? "Save connection" : "Add connection"}
+              </button>
+              {editingConnectionId ? <button type="button" onClick={resetConnectionDraft} style={styles.secondaryButton}>Cancel edit</button> : null}
+            </div>
           </section>
         ) : null}
 
@@ -1293,6 +1482,74 @@ const styles: Record<string, CSSProperties> = {
     color: "#5B3DF5",
     fontSize: 12,
     fontWeight: 700,
+  },
+  connectionList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    marginTop: 18,
+  },
+  connectionCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 20,
+    background: "rgba(255,255,255,0.78)",
+    border: "1px solid rgba(229,231,235,0.92)",
+  },
+  connectionAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    display: "grid",
+    placeItems: "center",
+    background: "linear-gradient(135deg, #7C3AED, #F59E0B)",
+    color: "#FFFFFF",
+    fontWeight: 900,
+    fontSize: 13,
+  },
+  connectionName: {
+    margin: 0,
+    fontSize: 15,
+    fontWeight: 850,
+    color: "#111827",
+  },
+  connectionMeta: {
+    margin: "3px 0 0",
+    fontSize: 12,
+    color: "#6B7280",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  smallGhostButton: {
+    border: "1px solid rgba(107,114,128,0.18)",
+    background: "rgba(255,255,255,0.72)",
+    color: "#374151",
+    borderRadius: 12,
+    padding: "8px 10px",
+    fontSize: 12,
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  smallDangerButton: {
+    border: "1px solid rgba(220,38,38,0.16)",
+    background: "rgba(254,242,242,0.9)",
+    color: "#DC2626",
+    borderRadius: 12,
+    padding: "8px 10px",
+    fontSize: 12,
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  emptyConnectionCard: {
+    padding: 16,
+    borderRadius: 18,
+    background: "rgba(255,255,255,0.72)",
+    border: "1px dashed rgba(107,114,128,0.28)",
+    color: "#6B7280",
+    fontSize: 14,
   },
   syncProviderRow: {
     display: "flex",

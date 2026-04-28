@@ -18,6 +18,7 @@ export async function getCollections() {
     toats: db.collection("toats"),
     captures: db.collection("captures"),
     people: db.collection("people"),
+    connections: db.collection("connections"),
     acl: db.collection("acl"),
     settings: db.collection("settings"),
     reminders: db.collection("reminders"),

@@ -30,17 +30,22 @@ export type ExtractionResult = z.infer<typeof ExtractionResultSchema>;
 
 // ─── Load system prompt ───────────────────────────────────────────────────────
 
-function getSystemPrompt(nowIso: string, timezone: string): string {
+function getSystemPrompt(nowIso: string, timezone: string, connectionContext?: string): string {
   const promptPath = join(process.cwd(), "src/lib/ai/prompts/extract.system.md");
   const base = readFileSync(promptPath, "utf-8");
-  return `${base}\n\nUser's current time: ${nowIso}\nUser's timezone: ${timezone}`;
+  return [
+    base,
+    `User's current time: ${nowIso}`,
+    `User's timezone: ${timezone}`,
+    connectionContext,
+  ].filter(Boolean).join("\n\n");
 }
 
 // ─── Main extraction function ─────────────────────────────────────────────────
 
 export async function extractToats(
   transcript: string,
-  options: { timezone?: string; now?: Date; userId?: string } = {}
+  options: { timezone?: string; now?: Date; userId?: string; connectionContext?: string } = {}
 ): Promise<ExtractionResult> {
   const now = options.now ?? new Date();
   const timezone = options.timezone ?? "UTC";
@@ -54,6 +59,7 @@ export async function extractToats(
     metadata: {
       timezone,
       transcriptLength: transcript.length,
+      hasConnectionContext: Boolean(options.connectionContext),
     },
   });
 
@@ -65,7 +71,7 @@ export async function extractToats(
       messages: [
         {
           role: "system",
-          content: getSystemPrompt(nowIso, timezone),
+          content: getSystemPrompt(nowIso, timezone, options.connectionContext),
         },
         {
           role: "user",

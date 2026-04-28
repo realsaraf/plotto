@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:toatre/models/connection.dart';
 import 'package:toatre/models/toat_summary.dart';
+import 'package:toatre/providers/share_provider.dart';
 import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
 
@@ -18,35 +21,32 @@ class ShareToatScreen extends StatefulWidget {
 class _ShareToatScreenState extends State<ShareToatScreen> {
   final Set<String> _selectedPeople = <String>{};
   _SharePermission _permission = _SharePermission.view;
+  bool _busy = false;
 
   @override
   void initState() {
     super.initState();
-    final people = _people;
-    for (final person in people.take(2)) {
-      _selectedPeople.add(person.name);
-    }
-  }
-
-  List<_SharePerson> get _people {
-    final fromToat = widget.toat.people
-        .where((person) => person.trim().isNotEmpty)
-        .map((person) => _SharePerson(name: _cleanPersonName(person)))
-        .toList();
-
-    if (fromToat.isNotEmpty) {
-      return fromToat;
-    }
-
-    return const <_SharePerson>[
-      _SharePerson(name: 'Priya'),
-      _SharePerson(name: 'Aman'),
-      _SharePerson(name: 'Riya'),
-    ];
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<ShareProvider>();
+      await provider.loadConnections();
+      if (!mounted) return;
+      setState(() {
+        _selectedPeople
+          ..clear()
+          ..addAll(
+            provider.connections.take(2).map((connection) => connection.id),
+          );
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final shareProvider = context.watch<ShareProvider>();
+    final people = shareProvider.connections
+        .map(_SharePerson.fromConnection)
+        .toList();
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -93,11 +93,18 @@ class _ShareToatScreenState extends State<ShareToatScreen> {
                     const SizedBox(height: 30),
                     Text('Share with', style: TextStyles.heading3),
                     const SizedBox(height: 18),
-                    _PeopleChooser(
-                      people: _people,
-                      selectedPeople: _selectedPeople,
-                      onToggle: _togglePerson,
-                    ),
+                    if (shareProvider.loading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (people.isEmpty)
+                      _EmptyConnectionsCard(
+                        onTap: () => Navigator.of(context).pop(),
+                      )
+                    else
+                      _PeopleChooser(
+                        people: people,
+                        selectedPeople: _selectedPeople,
+                        onToggle: _togglePerson,
+                      ),
                     const SizedBox(height: 28),
                     const Divider(color: Color(0xFFE6E6F0)),
                     const SizedBox(height: 24),
@@ -140,7 +147,7 @@ class _ShareToatScreenState extends State<ShareToatScreen> {
                       child: ElevatedButton.icon(
                         onPressed: _sendShare,
                         icon: const Icon(Icons.send_rounded),
-                        label: const Text('Send'),
+                        label: Text(_busy ? 'Sharing…' : 'Send'),
                         style: ElevatedButton.styleFrom(
                           textStyle: TextStyles.heading3.copyWith(
                             fontWeight: FontWeight.w800,
@@ -177,7 +184,7 @@ class _ShareToatScreenState extends State<ShareToatScreen> {
   }
 
   Future<void> _shareViaLink() async {
-    await Share.share(_shareText(), subject: widget.toat.title);
+    await _createShare(linkOnly: true);
   }
 
   Future<void> _sendShare() async {
@@ -186,25 +193,39 @@ class _ShareToatScreenState extends State<ShareToatScreen> {
       return;
     }
 
-    final names = _selectedPeople.join(', ');
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Share invite ready for $names.')));
+    await _createShare(linkOnly: false);
   }
 
-  String _shareText() {
-    final buffer = StringBuffer()..writeln(widget.toat.title);
-    if (widget.toat.datetime != null) {
-      buffer.writeln(_formatDateLine(widget.toat));
+  Future<void> _createShare({required bool linkOnly}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+
+    try {
+      final result = await context.read<ShareProvider>().shareToat(
+        toatId: widget.toat.id,
+        connectionIds: linkOnly ? const <String>[] : _selectedPeople.toList(),
+        permission: _permission.name,
+        linkOnly: linkOnly,
+      );
+      await Share.share(result.shareUrl, subject: widget.toat.title);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(linkOnly ? 'Share link ready.' : 'Share invite ready.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      final message =
+          context.read<ShareProvider>().error ?? 'Could not share this toat.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
-    if (widget.toat.location != null && widget.toat.location!.isNotEmpty) {
-      buffer.writeln(widget.toat.location);
-    }
-    if (widget.toat.notes != null && widget.toat.notes!.isNotEmpty) {
-      buffer.writeln(widget.toat.notes);
-    }
-    return buffer.toString().trim();
   }
 }
 
@@ -378,8 +399,8 @@ class _PeopleChooser extends StatelessWidget {
         for (final person in visible)
           _PersonBubble(
             person: person,
-            selected: selectedPeople.contains(person.name),
-            onTap: () => onToggle(person.name),
+            selected: selectedPeople.contains(person.id),
+            onTap: () => onToggle(person.id),
           ),
         const _MoreBubble(),
       ],
@@ -460,6 +481,12 @@ class _PersonBubble extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyles.bodyMedium,
+            ),
+            Text(
+              person.relationship,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyles.small.copyWith(color: AppColors.textMuted),
             ),
           ],
         ),
@@ -678,19 +705,58 @@ class _PermissionOption extends StatelessWidget {
 }
 
 class _SharePerson {
-  const _SharePerson({required this.name});
+  const _SharePerson({
+    required this.id,
+    required this.name,
+    required this.relationship,
+  });
 
+  factory _SharePerson.fromConnection(ToatreConnection connection) {
+    return _SharePerson(
+      id: connection.id,
+      name: connection.name,
+      relationship: connection.relationship,
+    );
+  }
+
+  final String id;
   final String name;
+  final String relationship;
 }
 
 enum _SharePermission { view, edit }
 
-String _cleanPersonName(String value) {
-  final trimmed = value.trim();
-  if (trimmed.startsWith('@')) {
-    return trimmed.substring(1);
+class _EmptyConnectionsCard extends StatelessWidget {
+  const _EmptyConnectionsCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE7E7F0)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.group_add_outlined, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Add connections in Settings before sharing with people.',
+                style: TextStyles.body.copyWith(color: AppColors.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-  return trimmed;
 }
 
 String _initials(String name) {

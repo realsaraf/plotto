@@ -4,6 +4,7 @@ import { getCollections } from "@/lib/mongo/collections";
 import { MODELS } from "@/lib/ai/openai";
 import { extractToats } from "@/lib/ai/extract";
 import { flushObservedOpenAI, getObservedOpenAI } from "@/lib/ai/langfuse";
+import { buildConnectionContext, serializeConnection } from "@/lib/connections";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
@@ -97,7 +98,18 @@ export async function POST(request: NextRequest) {
   // ── Extract toats ───────────────────────────────────────────────────────────
   let extraction;
   try {
-    extraction = await extractToats(transcript, { timezone, now: new Date(), userId: user.uid });
+    const { connections } = await getCollections();
+    const connectionDocs = await connections
+      .find({ ownerId: new ObjectId(user.mongoId) })
+      .sort({ relationship: 1, name: 1 })
+      .limit(50)
+      .toArray();
+    extraction = await extractToats(transcript, {
+      timezone,
+      now: new Date(),
+      userId: user.uid,
+      connectionContext: buildConnectionContext(connectionDocs.map(serializeConnection)),
+    });
   } catch (err) {
     console.error("[captures] Extraction error:", err);
     return NextResponse.json({ error: "Extraction failed" }, { status: 502 });
