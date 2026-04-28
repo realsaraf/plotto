@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
+import { GoogleAuthProvider, linkWithPopup, reauthenticateWithPopup } from "firebase/auth";
 import {
   AppBrand,
   BottomTabBar,
@@ -16,8 +17,18 @@ import { TOAT_KINDS, type NotificationPreferences } from "@/lib/settings/default
 import { useAuth } from "@/lib/auth/auth-context";
 import type { ToatKind } from "@/types";
 
-type SettingsTab = "profile" | "phone" | "handle" | "pings";
+type SettingsTab = "profile" | "pings" | "sync";
 type NoticeTone = "idle" | "success" | "error";
+type SyncDirection = "sourceToToatre" | "toatreToSource" | "twoWay";
+
+interface SyncConnection {
+  provider: "googleCalendar";
+  direction: SyncDirection;
+  connected: boolean;
+  connectedAt: string | null;
+  forwardOnlyFrom: string | null;
+  updatedAt: string | null;
+}
 
 interface SettingsResponse {
   profile: {
@@ -37,14 +48,14 @@ interface SettingsResponse {
     workStart: string;
     workEnd: string;
     notificationPreferences: NotificationPreferences;
+    syncConnections: Record<string, SyncConnection>;
   };
 }
 
 const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: "profile", label: "General" },
-  { id: "phone", label: "Phone" },
-  { id: "handle", label: "Handle" },
   { id: "pings", label: "Pings" },
+  { id: "sync", label: "Sync" },
 ];
 
 const KIND_LABELS: Record<ToatKind, string> = {
@@ -55,6 +66,24 @@ const KIND_LABELS: Record<ToatKind, string> = {
   errand: "Errands",
   deadline: "Deadlines",
 };
+
+const SYNC_DIRECTION_OPTIONS: Array<{ id: SyncDirection; title: string; body: string }> = [
+  {
+    id: "sourceToToatre",
+    title: "Google to Toatre",
+    body: "New Google Calendar entries become Toatre toats.",
+  },
+  {
+    id: "toatreToSource",
+    title: "Toatre to Google",
+    body: "New scheduled Toatre toats are sent to Google Calendar.",
+  },
+  {
+    id: "twoWay",
+    title: "Two-way",
+    body: "New items move both ways from now on.",
+  },
+];
 
 const PROVIDER_LABELS: Record<string, string> = {
   "google.com": "Google",
@@ -85,6 +114,19 @@ async function readJsonResponse<T>(response: Response): Promise<T | null> {
   }
 }
 
+function formatSyncDate(value: string | null | undefined): string {
+  if (!value) {
+    return "just now";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
@@ -104,6 +146,8 @@ export default function SettingsPage() {
   const [verificationCode, setVerificationCode] = useState("");
   const [smsEnabled, setSmsEnabled] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(null);
+  const [syncConnections, setSyncConnections] = useState<Record<string, SyncConnection>>({});
+  const [googleCalendarDirection, setGoogleCalendarDirection] = useState<SyncDirection>("sourceToToatre");
 
   const timezoneOptions = useMemo(() => getTimezoneOptions(timezone || Intl.DateTimeFormat().resolvedOptions().timeZone), [timezone]);
 
@@ -129,6 +173,8 @@ export default function SettingsPage() {
     setPhoneDraft(payload.settings.pendingPhone ?? payload.settings.reminderPhone ?? "");
     setSmsEnabled(payload.settings.smsEnabled);
     setNotificationPreferences(payload.settings.notificationPreferences);
+    setSyncConnections(payload.settings.syncConnections ?? {});
+    setGoogleCalendarDirection(payload.settings.syncConnections?.googleCalendar?.direction ?? "sourceToToatre");
   }, []);
 
   const authorizedFetch = useCallback(async (input: string, init?: RequestInit) => {
@@ -344,6 +390,90 @@ export default function SettingsPage() {
     }
   }, [applySettingsPayload, authorizedFetch, notificationPreferences]);
 
+  const saveSyncConnections = useCallback(async (nextConnections: Record<string, SyncConnection>) => {
+    setSavingKey("sync-google");
+    try {
+      const response = await authorizedFetch("/api/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ syncConnections: nextConnections }),
+      });
+      const data = await readJsonResponse<SettingsResponse & { error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Couldn't save your sync settings.");
+      }
+
+      if (!data) {
+        throw new Error("Couldn't save your sync settings.");
+      }
+
+      applySettingsPayload(data);
+      return data;
+    } catch (error) {
+      console.error("[settings/sync]", error);
+      setError(error instanceof Error ? error.message : "Couldn't save your sync settings.");
+      throw error;
+    } finally {
+      setSavingKey(null);
+    }
+  }, [applySettingsPayload, authorizedFetch]);
+
+  const connectGoogleCalendar = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    setSavingKey("sync-google");
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope("https://www.googleapis.com/auth/calendar.events");
+      provider.setCustomParameters({ prompt: "consent" });
+
+      const hasGoogleProvider = user.providerData.some((providerData) => providerData.providerId === "google.com");
+      if (hasGoogleProvider) {
+        await reauthenticateWithPopup(user, provider);
+      } else {
+        await linkWithPopup(user, provider);
+      }
+
+      const now = new Date().toISOString();
+      const existing = syncConnections.googleCalendar;
+      await saveSyncConnections({
+        ...syncConnections,
+        googleCalendar: {
+          provider: "googleCalendar",
+          direction: googleCalendarDirection,
+          connected: true,
+          connectedAt: existing?.connectedAt ?? now,
+          forwardOnlyFrom: existing?.forwardOnlyFrom ?? now,
+          updatedAt: now,
+        },
+      });
+      setSuccess("Google Calendar sync connected.");
+    } catch (error) {
+      console.error("[settings/sync/google/connect]", error);
+      setError(error instanceof Error ? error.message : "Couldn't connect Google Calendar sync.");
+    } finally {
+      setSavingKey(null);
+    }
+  }, [googleCalendarDirection, saveSyncConnections, syncConnections, user]);
+
+  const disconnectGoogleCalendar = useCallback(async () => {
+    const now = new Date().toISOString();
+    const existing = syncConnections.googleCalendar;
+    await saveSyncConnections({
+      ...syncConnections,
+      googleCalendar: {
+        provider: "googleCalendar",
+        direction: googleCalendarDirection,
+        connected: false,
+        connectedAt: null,
+        forwardOnlyFrom: null,
+        updatedAt: now,
+      },
+    });
+    setSuccess(existing?.connected ? "Google Calendar sync paused." : "Google Calendar sync is paused.");
+  }, [googleCalendarDirection, saveSyncConnections, syncConnections]);
+
   const handleSignOut = useCallback(async () => {
     setSavingKey("signout");
     try {
@@ -503,11 +633,37 @@ export default function SettingsPage() {
             <button type="button" onClick={() => void saveProfile()} style={styles.primaryButton} disabled={savingKey === "profile"}>
               {savingKey === "profile" ? "Saving…" : "Save general settings"}
             </button>
-          </section>
-        ) : null}
 
-        {!loadingState && settingsData && activeTab === "phone" ? (
-          <section style={styles.panelCard}>
+            <div style={styles.sectionDivider} />
+
+            <div style={styles.sectionHead}>
+              <div>
+                <p style={styles.sectionEyebrow}>Handle</p>
+                <h2 style={styles.sectionTitle}>Update your sharing handle</h2>
+              </div>
+            </div>
+
+            <label style={styles.fieldLabel}>
+              Handle
+              <div style={styles.handleField}>
+                <span style={styles.handlePrefix}>@</span>
+                <input
+                  value={handleDraft.replace(/^@+/, "")}
+                  onChange={(event) => setHandleDraft(event.target.value.replace(/^@+/, ""))}
+                  style={styles.handleInput}
+                  placeholder="yourname"
+                />
+              </div>
+            </label>
+
+            <p style={styles.helperText}>Handles can use letters, numbers, and underscores.</p>
+
+            <button type="button" onClick={() => void saveHandle()} style={styles.primaryButton} disabled={savingKey === "handle"}>
+              {savingKey === "handle" ? "Saving…" : "Save handle"}
+            </button>
+
+            <div style={styles.sectionDivider} />
+
             <div style={styles.sectionHead}>
               <div>
                 <p style={styles.sectionEyebrow}>Phone</p>
@@ -568,36 +724,6 @@ export default function SettingsPage() {
           </section>
         ) : null}
 
-        {!loadingState && settingsData && activeTab === "handle" ? (
-          <section style={styles.panelCard}>
-            <div style={styles.sectionHead}>
-              <div>
-                <p style={styles.sectionEyebrow}>Handle</p>
-                <h2 style={styles.sectionTitle}>Update your sharing handle</h2>
-              </div>
-            </div>
-
-            <label style={styles.fieldLabel}>
-              Handle
-              <div style={styles.handleField}>
-                <span style={styles.handlePrefix}>@</span>
-                <input
-                  value={handleDraft.replace(/^@+/, "")}
-                  onChange={(event) => setHandleDraft(event.target.value.replace(/^@+/, ""))}
-                  style={styles.handleInput}
-                  placeholder="yourname"
-                />
-              </div>
-            </label>
-
-            <p style={styles.helperText}>Handles can use letters, numbers, and underscores.</p>
-
-            <button type="button" onClick={() => void saveHandle()} style={styles.primaryButton} disabled={savingKey === "handle"}>
-              {savingKey === "handle" ? "Saving…" : "Save handle"}
-            </button>
-          </section>
-        ) : null}
-
         {!loadingState && settingsData && activeTab === "pings" && notificationPreferences ? (
           <section style={styles.panelCard}>
             <div style={styles.sectionHead}>
@@ -635,6 +761,101 @@ export default function SettingsPage() {
             <button type="button" onClick={() => void savePings()} style={styles.primaryButton} disabled={savingKey === "pings"}>
               {savingKey === "pings" ? "Saving…" : "Save Ping settings"}
             </button>
+          </section>
+        ) : null}
+
+        {!loadingState && settingsData && activeTab === "sync" ? (
+          <section style={styles.panelCard}>
+            <div style={styles.sectionHead}>
+              <div>
+                <p style={styles.sectionEyebrow}>Sync</p>
+                <h2 style={styles.sectionTitle}>Keep calendars moving with Toatre</h2>
+              </div>
+            </div>
+
+            <p style={styles.helperText}>
+              Connect services one at a time. Sync starts from the moment a service is connected, so older calendar entries stay where they are.
+            </p>
+
+            <div style={styles.syncProviderRow}>
+              <button type="button" style={{ ...styles.syncProviderButton, ...styles.syncProviderButtonActive }}>
+                <span style={styles.googleProviderMark}>G</span>
+                Google Calendar
+                {syncConnections.googleCalendar?.connected ? <span style={styles.connectedDot}>Connected</span> : null}
+              </button>
+              <button type="button" style={styles.syncProviderButton} disabled>
+                <span style={styles.providerIcon}>iOS</span>
+                iOS Calendar
+              </button>
+              <button type="button" style={styles.syncProviderButton} disabled>
+                <span style={styles.providerIcon}>365</span>
+                Office 365
+              </button>
+            </div>
+
+            <div style={styles.syncCard}>
+              <div style={styles.syncCardHead}>
+                <div style={styles.syncTitleRow}>
+                  <span style={styles.googleProviderMarkLarge}>G</span>
+                  <div>
+                    <h3 style={styles.syncCardTitle}>Google Calendar</h3>
+                    <p style={styles.helperText}>
+                      {syncConnections.googleCalendar?.connected
+                        ? `Connected ${formatSyncDate(syncConnections.googleCalendar.connectedAt)}`
+                        : "Choose a direction, then connect Google Calendar."}
+                    </p>
+                  </div>
+                </div>
+                <span style={syncConnections.googleCalendar?.connected ? styles.statusChip : styles.statusChipMuted}>
+                  {syncConnections.googleCalendar?.connected ? "Connected" : "Ready"}
+                </span>
+              </div>
+
+              <div style={styles.syncDiagram}>
+                <span style={styles.googleProviderMarkLarge}>G</span>
+                <span style={{ ...styles.syncArrow, color: googleCalendarDirection !== "sourceToToatre" ? "#5B3DF5" : "#9CA3AF" }}>←</span>
+                <span style={styles.syncLine} />
+                <span style={{ ...styles.syncArrow, color: googleCalendarDirection !== "toatreToSource" ? "#5B3DF5" : "#9CA3AF" }}>→</span>
+                <span style={styles.toatreSyncMark}>to</span>
+              </div>
+
+              <div style={styles.directionList}>
+                {SYNC_DIRECTION_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setGoogleCalendarDirection(option.id)}
+                    style={{
+                      ...styles.directionOption,
+                      ...(googleCalendarDirection === option.id ? styles.directionOptionActive : {}),
+                    }}
+                  >
+                    <span style={styles.radioMark}>{googleCalendarDirection === option.id ? "●" : "○"}</span>
+                    <span>
+                      <strong style={styles.directionTitle}>{option.title}</strong>
+                      <span style={styles.directionBody}>{option.body}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <p style={styles.helperText}>
+                Marking a toat done will not hide the original Google Calendar entry.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => syncConnections.googleCalendar?.connected ? void disconnectGoogleCalendar() : void connectGoogleCalendar()}
+                style={styles.primaryButton}
+                disabled={savingKey === "sync-google"}
+              >
+                {savingKey === "sync-google"
+                  ? "Opening Google…"
+                  : syncConnections.googleCalendar?.connected
+                    ? "Pause Google Calendar sync"
+                    : "Connect Google Calendar"}
+              </button>
+            </div>
           </section>
         ) : null}
 
@@ -871,6 +1092,11 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     color: "#0F1B4C",
   },
+  sectionDivider: {
+    height: 1,
+    background: "rgba(99,102,241,0.10)",
+    margin: "6px 0",
+  },
   formGrid: {
     display: "flex",
     flexDirection: "column",
@@ -1060,5 +1286,173 @@ const styles: Record<string, CSSProperties> = {
     color: "#5B3DF5",
     fontSize: 12,
     fontWeight: 700,
+  },
+  syncProviderRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  syncProviderButton: {
+    minHeight: 44,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 9,
+    padding: "0 13px",
+    borderRadius: 18,
+    border: "1px solid rgba(99,102,241,0.10)",
+    background: "rgba(255,255,255,0.82)",
+    color: "#6B7280",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  syncProviderButtonActive: {
+    background: "rgba(91,61,245,0.10)",
+    color: "#5B3DF5",
+    borderColor: "rgba(91,61,245,0.18)",
+  },
+  googleProviderMark: {
+    width: 26,
+    height: 26,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    background: "#FFFFFF",
+    border: "1px solid rgba(99,102,241,0.12)",
+    color: "#4285F4",
+    fontSize: 14,
+    fontWeight: 800,
+  },
+  googleProviderMarkLarge: {
+    width: 48,
+    height: 48,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    background: "#FFFFFF",
+    border: "1px solid rgba(99,102,241,0.12)",
+    color: "#4285F4",
+    fontSize: 24,
+    fontWeight: 800,
+    flexShrink: 0,
+  },
+  providerIcon: {
+    minWidth: 28,
+    height: 26,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    background: "rgba(91,61,245,0.08)",
+    color: "#5B3DF5",
+    fontSize: 11,
+    fontWeight: 800,
+  },
+  connectedDot: {
+    padding: "4px 7px",
+    borderRadius: 999,
+    background: "rgba(34,197,94,0.12)",
+    color: "#15803D",
+    fontSize: 11,
+    fontWeight: 800,
+  },
+  syncCard: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+    padding: 18,
+    borderRadius: 22,
+    background: "rgba(255,255,255,0.9)",
+    border: "1px solid rgba(99,102,241,0.10)",
+  },
+  syncCardHead: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  syncTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+  },
+  syncCardTitle: {
+    fontSize: 18,
+    fontWeight: 800,
+    color: "#111827",
+    marginBottom: 4,
+  },
+  syncDiagram: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: 14,
+    borderRadius: 18,
+    background: "rgba(91,61,245,0.06)",
+  },
+  syncArrow: {
+    fontSize: 24,
+    fontWeight: 900,
+  },
+  syncLine: {
+    flex: 1,
+    minWidth: 32,
+    height: 2,
+    borderRadius: 99,
+    background: "rgba(99,102,241,0.14)",
+  },
+  toatreSyncMark: {
+    width: 48,
+    height: 48,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    background: "linear-gradient(135deg, #5B3DF5, #F59E0B)",
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: 900,
+    flexShrink: 0,
+  },
+  directionList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
+  directionOption: {
+    width: "100%",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    border: "1px solid rgba(99,102,241,0.10)",
+    background: "rgba(255,255,255,0.7)",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  directionOptionActive: {
+    background: "rgba(91,61,245,0.10)",
+    borderColor: "rgba(91,61,245,0.18)",
+  },
+  radioMark: {
+    color: "#5B3DF5",
+    fontSize: 18,
+    lineHeight: 1.2,
+  },
+  directionTitle: {
+    display: "block",
+    color: "#111827",
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  directionBody: {
+    display: "block",
+    color: "#6B7280",
+    fontSize: 13,
+    lineHeight: 1.45,
   },
 };

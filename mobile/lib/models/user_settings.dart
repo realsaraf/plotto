@@ -73,6 +73,75 @@ class NotificationChannels {
 
 typedef NotificationPreferences = Map<String, NotificationChannels>;
 
+enum SyncProviderKind { googleCalendar }
+
+enum SyncDirection { sourceToToatre, toatreToSource, twoWay }
+
+const String googleCalendarProviderKey = 'googleCalendar';
+
+class SyncConnection {
+  const SyncConnection({
+    required this.provider,
+    required this.direction,
+    required this.connected,
+    required this.connectedAt,
+    required this.forwardOnlyFrom,
+    required this.updatedAt,
+  });
+
+  final String provider;
+  final SyncDirection direction;
+  final bool connected;
+  final DateTime? connectedAt;
+  final DateTime? forwardOnlyFrom;
+  final DateTime? updatedAt;
+
+  factory SyncConnection.fromJson(Map<String, dynamic> json) {
+    return SyncConnection(
+      provider: json['provider'] as String? ?? googleCalendarProviderKey,
+      direction: syncDirectionFromString(json['direction'] as String?),
+      connected: json['connected'] == true,
+      connectedAt: _parseSettingsDate(json['connectedAt']),
+      forwardOnlyFrom: _parseSettingsDate(json['forwardOnlyFrom']),
+      updatedAt: _parseSettingsDate(json['updatedAt']),
+    );
+  }
+
+  SyncConnection copyWith({
+    SyncDirection? direction,
+    bool? connected,
+    DateTime? connectedAt,
+    bool clearConnectedAt = false,
+    DateTime? forwardOnlyFrom,
+    bool clearForwardOnlyFrom = false,
+    DateTime? updatedAt,
+  }) {
+    return SyncConnection(
+      provider: provider,
+      direction: direction ?? this.direction,
+      connected: connected ?? this.connected,
+      connectedAt: clearConnectedAt ? null : connectedAt ?? this.connectedAt,
+      forwardOnlyFrom: clearForwardOnlyFrom
+          ? null
+          : forwardOnlyFrom ?? this.forwardOnlyFrom,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'provider': provider,
+      'direction': syncDirectionToString(direction),
+      'connected': connected,
+      'connectedAt': connectedAt?.toIso8601String(),
+      'forwardOnlyFrom': forwardOnlyFrom?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+    };
+  }
+}
+
+typedef SyncConnections = Map<String, SyncConnection>;
+
 NotificationPreferences createDefaultNotificationPreferences() {
   return <String, NotificationChannels>{
     for (final kind in toatKinds)
@@ -103,6 +172,48 @@ Map<String, dynamic> notificationPreferencesToJson(
   };
 }
 
+SyncDirection syncDirectionFromString(String? value) {
+  switch (value) {
+    case 'sourceToToatre':
+      return SyncDirection.sourceToToatre;
+    case 'toatreToSource':
+      return SyncDirection.toatreToSource;
+    case 'twoWay':
+      return SyncDirection.twoWay;
+    default:
+      return SyncDirection.sourceToToatre;
+  }
+}
+
+String syncDirectionToString(SyncDirection direction) {
+  switch (direction) {
+    case SyncDirection.sourceToToatre:
+      return 'sourceToToatre';
+    case SyncDirection.toatreToSource:
+      return 'toatreToSource';
+    case SyncDirection.twoWay:
+      return 'twoWay';
+  }
+}
+
+SyncConnections syncConnectionsFromJson(Object? input) {
+  if (input is! Map<String, dynamic>) {
+    return <String, SyncConnection>{};
+  }
+
+  return <String, SyncConnection>{
+    for (final entry in input.entries)
+      if (entry.value is Map<String, dynamic>)
+        entry.key: SyncConnection.fromJson(entry.value as Map<String, dynamic>),
+  };
+}
+
+Map<String, dynamic> syncConnectionsToJson(SyncConnections connections) {
+  return <String, dynamic>{
+    for (final entry in connections.entries) entry.key: entry.value.toJson(),
+  };
+}
+
 class AppSettings {
   const AppSettings({
     required this.timezone,
@@ -115,6 +226,7 @@ class AppSettings {
     required this.workStart,
     required this.workEnd,
     required this.notificationPreferences,
+    required this.syncConnections,
   });
 
   final String timezone;
@@ -127,6 +239,7 @@ class AppSettings {
   final String workStart;
   final String workEnd;
   final NotificationPreferences notificationPreferences;
+  final SyncConnections syncConnections;
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
     return AppSettings(
@@ -136,12 +249,13 @@ class AppSettings {
       reminderPhone: json['reminderPhone'] as String?,
       pendingPhone: json['pendingPhone'] as String?,
       phoneVerified: json['phoneVerified'] == true,
-      phoneVerifiedAt: _parseDate(json['phoneVerifiedAt']),
+      phoneVerifiedAt: _parseSettingsDate(json['phoneVerifiedAt']),
       workStart: json['workStart'] as String? ?? '09:00',
       workEnd: json['workEnd'] as String? ?? '17:30',
       notificationPreferences: notificationPreferencesFromJson(
         json['notificationPreferences'],
       ),
+      syncConnections: syncConnectionsFromJson(json['syncConnections']),
     );
   }
 
@@ -159,6 +273,7 @@ class AppSettings {
     String? workStart,
     String? workEnd,
     NotificationPreferences? notificationPreferences,
+    SyncConnections? syncConnections,
   }) {
     return AppSettings(
       timezone: timezone ?? this.timezone,
@@ -178,6 +293,7 @@ class AppSettings {
       workEnd: workEnd ?? this.workEnd,
       notificationPreferences:
           notificationPreferences ?? this.notificationPreferences,
+      syncConnections: syncConnections ?? this.syncConnections,
     );
   }
 
@@ -195,16 +311,17 @@ class AppSettings {
       'notificationPreferences': notificationPreferencesToJson(
         notificationPreferences,
       ),
+      'syncConnections': syncConnectionsToJson(syncConnections),
     };
   }
+}
 
-  static DateTime? _parseDate(Object? value) {
-    if (value is! String || value.isEmpty) {
-      return null;
-    }
-
-    return DateTime.tryParse(value)?.toLocal();
+DateTime? _parseSettingsDate(Object? value) {
+  if (value is! String || value.isEmpty) {
+    return null;
   }
+
+  return DateTime.tryParse(value)?.toLocal();
 }
 
 class SettingsPayload {

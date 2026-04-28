@@ -5,6 +5,7 @@ import { getCollections } from "@/lib/mongo/collections";
 import {
   createDefaultUserSettings,
   normalizeNotificationPreferences,
+  normalizeSyncConnections,
 } from "@/lib/settings/defaults";
 
 function isTimeValue(value: string) {
@@ -68,6 +69,7 @@ function serializeSettings(userDoc: Record<string, unknown>, settingsDoc: Record
           ? settingsDoc.workEnd
           : defaults.workEnd,
       notificationPreferences: normalizeNotificationPreferences(settingsDoc?.notificationPreferences),
+      syncConnections: normalizeSyncConnections(settingsDoc?.syncConnections),
     },
   };
 }
@@ -166,6 +168,10 @@ export async function PATCH(request: NextRequest) {
 
   if ("notificationPreferences" in payload) {
     updates.notificationPreferences = normalizeNotificationPreferences(payload.notificationPreferences);
+  }
+
+  if ("syncConnections" in payload) {
+    updates.syncConnections = normalizeSyncConnections(payload.syncConnections);
   }
 
   if (Object.keys(updates).length === 1) {

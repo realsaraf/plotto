@@ -8,6 +8,19 @@ export interface NotificationChannels {
 
 export type NotificationPreferences = Record<ToatKind, NotificationChannels>;
 
+export type SyncDirection = "sourceToToatre" | "toatreToSource" | "twoWay";
+
+export interface SyncConnection {
+  provider: "googleCalendar";
+  direction: SyncDirection;
+  connected: boolean;
+  connectedAt: string | null;
+  forwardOnlyFrom: string | null;
+  updatedAt: string | null;
+}
+
+export type SyncConnections = Record<string, SyncConnection>;
+
 export const TOAT_KINDS: ToatKind[] = ["task", "event", "meeting", "idea", "errand", "deadline"];
 
 const DEFAULT_CHANNELS: NotificationChannels = {
@@ -48,6 +61,52 @@ export function normalizeNotificationPreferences(input: unknown): NotificationPr
   return defaults;
 }
 
+function normalizeDateString(input: unknown): string | null {
+  if (input instanceof Date) {
+    return input.toISOString();
+  }
+
+  if (typeof input !== "string" || !input) {
+    return null;
+  }
+
+  const date = new Date(input);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function normalizeSyncDirection(input: unknown): SyncDirection {
+  if (input === "toatreToSource" || input === "twoWay") {
+    return input;
+  }
+
+  return "sourceToToatre";
+}
+
+export function normalizeSyncConnections(input: unknown): SyncConnections {
+  if (!input || typeof input !== "object") {
+    return {};
+  }
+
+  const record = input as Record<string, unknown>;
+  const googleCalendar = record.googleCalendar;
+
+  if (!googleCalendar || typeof googleCalendar !== "object") {
+    return {};
+  }
+
+  const connection = googleCalendar as Record<string, unknown>;
+  return {
+    googleCalendar: {
+      provider: "googleCalendar",
+      direction: normalizeSyncDirection(connection.direction),
+      connected: connection.connected === true,
+      connectedAt: normalizeDateString(connection.connectedAt),
+      forwardOnlyFrom: normalizeDateString(connection.forwardOnlyFrom),
+      updatedAt: normalizeDateString(connection.updatedAt),
+    },
+  };
+}
+
 export function createDefaultUserSettings(timezone: string) {
   return {
     timezone,
@@ -59,5 +118,6 @@ export function createDefaultUserSettings(timezone: string) {
     workStart: "09:00",
     workEnd: "17:30",
     notificationPreferences: createDefaultNotificationPreferences(),
+    syncConnections: {} as SyncConnections,
   };
 }

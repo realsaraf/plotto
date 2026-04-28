@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +11,7 @@ import 'package:toatre/ui/auth/login_screen.dart';
 import 'package:toatre/utils/app_colors.dart';
 import 'package:toatre/utils/text_styles.dart';
 
-enum SettingsTab { general, phone, handle, pings }
+enum SettingsTab { general, pings, sync }
 
 enum _NoticeTone { success, error }
 
@@ -46,6 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _smsEnabled = false;
   NotificationPreferences _notificationPreferences =
       createDefaultNotificationPreferences();
+  SyncConnections _syncConnections = <String, SyncConnection>{};
+  SyncDirection _googleCalendarDirection = SyncDirection.sourceToToatre;
 
   @override
   void initState() {
@@ -135,50 +139,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ] else if (payload != null) ...[
                       const SizedBox(height: 16),
                       if (_activeTab == SettingsTab.general)
-                        _GeneralTab(
-                          timezone: _timezone,
-                          workStart: _workStart,
-                          workEnd: _workEnd,
-                          voiceRetention: _voiceRetention,
-                          busy: settingsProvider.savingKey == 'general',
-                          onTimezoneChanged: (value) =>
-                              setState(() => _timezone = value),
-                          onWorkStartChanged: (value) =>
-                              setState(() => _workStart = value),
-                          onWorkEndChanged: (value) =>
-                              setState(() => _workEnd = value),
-                          onVoiceRetentionChanged: (value) =>
-                              setState(() => _voiceRetention = value),
-                          onSave: () => _saveGeneral(settingsProvider),
-                        ),
-                      if (_activeTab == SettingsTab.phone)
-                        _PhoneTab(
-                          phoneDraft: _phoneDraft,
-                          verificationCode: _verificationCode,
-                          smsEnabled: _smsEnabled,
-                          settings: payload.settings,
-                          sendingCode:
-                              settingsProvider.savingKey == 'phone-start',
-                          verifying:
-                              settingsProvider.savingKey == 'phone-check',
-                          saving: settingsProvider.savingKey == 'phone-save',
-                          onPhoneChanged: (value) =>
-                              setState(() => _phoneDraft = value),
-                          onCodeChanged: (value) =>
-                              setState(() => _verificationCode = value),
-                          onSmsEnabledChanged: (value) =>
-                              setState(() => _smsEnabled = value),
-                          onSendCode: () => _sendPhoneCode(settingsProvider),
-                          onVerify: () => _verifyPhone(settingsProvider),
-                          onSave: () => _savePhone(settingsProvider),
-                        ),
-                      if (_activeTab == SettingsTab.handle)
-                        _HandleTab(
-                          handle: _handleDraft,
-                          busy: settingsProvider.savingKey == 'handle',
-                          onChanged: (value) =>
-                              setState(() => _handleDraft = value),
-                          onSave: () => _saveHandle(settingsProvider),
+                        Column(
+                          children: [
+                            _GeneralTab(
+                              timezone: _timezone,
+                              workStart: _workStart,
+                              workEnd: _workEnd,
+                              voiceRetention: _voiceRetention,
+                              busy: settingsProvider.savingKey == 'general',
+                              onTimezoneChanged: (value) =>
+                                  setState(() => _timezone = value),
+                              onWorkStartChanged: (value) =>
+                                  setState(() => _workStart = value),
+                              onWorkEndChanged: (value) =>
+                                  setState(() => _workEnd = value),
+                              onVoiceRetentionChanged: (value) =>
+                                  setState(() => _voiceRetention = value),
+                              onSave: () => _saveGeneral(settingsProvider),
+                            ),
+                            const SizedBox(height: 16),
+                            _HandleTab(
+                              handle: _handleDraft,
+                              busy: settingsProvider.savingKey == 'handle',
+                              onChanged: (value) =>
+                                  setState(() => _handleDraft = value),
+                              onSave: () => _saveHandle(settingsProvider),
+                            ),
+                            const SizedBox(height: 16),
+                            _PhoneTab(
+                              phoneDraft: _phoneDraft,
+                              verificationCode: _verificationCode,
+                              smsEnabled: _smsEnabled,
+                              settings: payload.settings,
+                              sendingCode:
+                                  settingsProvider.savingKey == 'phone-start',
+                              verifying:
+                                  settingsProvider.savingKey == 'phone-check',
+                              saving:
+                                  settingsProvider.savingKey == 'phone-save',
+                              onPhoneChanged: (value) =>
+                                  setState(() => _phoneDraft = value),
+                              onCodeChanged: (value) =>
+                                  setState(() => _verificationCode = value),
+                              onSmsEnabledChanged: (value) =>
+                                  setState(() => _smsEnabled = value),
+                              onSendCode: () =>
+                                  _sendPhoneCode(settingsProvider),
+                              onVerify: () => _verifyPhone(settingsProvider),
+                              onSave: () => _savePhone(settingsProvider),
+                            ),
+                          ],
                         ),
                       if (_activeTab == SettingsTab.pings)
                         _PingsTab(
@@ -186,6 +196,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           busy: settingsProvider.savingKey == 'pings',
                           onToggle: _toggleChannel,
                           onSave: () => _savePings(settingsProvider),
+                        ),
+                      if (_activeTab == SettingsTab.sync)
+                        _SyncTab(
+                          googleConnection:
+                              _syncConnections[googleCalendarProviderKey],
+                          googleDirection: _googleCalendarDirection,
+                          busy: settingsProvider.savingKey == 'sync-google',
+                          showIosCalendar: Platform.isIOS,
+                          onDirectionChanged: (direction) => setState(
+                            () => _googleCalendarDirection = direction,
+                          ),
+                          onConnectGoogle: () =>
+                              _connectGoogleCalendar(settingsProvider),
+                          onDisconnectGoogle: () =>
+                              _disconnectGoogleCalendar(settingsProvider),
                         ),
                     ],
                   ],
@@ -212,6 +237,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       for (final entry in payload.settings.notificationPreferences.entries)
         entry.key: entry.value.copyWith(),
     };
+    _syncConnections = <String, SyncConnection>{
+      for (final entry in payload.settings.syncConnections.entries)
+        entry.key: entry.value,
+    };
+    _googleCalendarDirection =
+        _syncConnections[googleCalendarProviderKey]?.direction ??
+        SyncDirection.sourceToToatre;
   }
 
   void _showNotice(String message, _NoticeTone tone) {
@@ -306,6 +338,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _connectGoogleCalendar(SettingsProvider provider) async {
+    try {
+      await provider.connectGoogleCalendar(direction: _googleCalendarDirection);
+      _showNotice('Google Calendar sync connected.', _NoticeTone.success);
+    } catch (_) {
+      _showNotice(
+        provider.error ?? 'Could not connect Google Calendar sync.',
+        _NoticeTone.error,
+      );
+    }
+  }
+
+  Future<void> _disconnectGoogleCalendar(SettingsProvider provider) async {
+    try {
+      await provider.disconnectGoogleCalendar(
+        direction: _googleCalendarDirection,
+      );
+      _showNotice('Google Calendar sync paused.', _NoticeTone.success);
+    } catch (_) {
+      _showNotice(
+        provider.error ?? 'Could not pause Google Calendar sync.',
+        _NoticeTone.error,
+      );
+    }
+  }
+
   Future<void> _signOut(BuildContext context) async {
     if (_signingOut) {
       return;
@@ -342,12 +400,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     switch (tab) {
       case SettingsTab.general:
         return 'General';
-      case SettingsTab.phone:
-        return 'Phone';
-      case SettingsTab.handle:
-        return 'Handle';
       case SettingsTab.pings:
         return 'Pings';
+      case SettingsTab.sync:
+        return 'Sync';
     }
   }
 }
@@ -903,6 +959,403 @@ class _PingsTab extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SyncTab extends StatelessWidget {
+  const _SyncTab({
+    required this.googleConnection,
+    required this.googleDirection,
+    required this.busy,
+    required this.showIosCalendar,
+    required this.onDirectionChanged,
+    required this.onConnectGoogle,
+    required this.onDisconnectGoogle,
+  });
+
+  final SyncConnection? googleConnection;
+  final SyncDirection googleDirection;
+  final bool busy;
+  final bool showIosCalendar;
+  final ValueChanged<SyncDirection> onDirectionChanged;
+  final VoidCallback onConnectGoogle;
+  final VoidCallback onDisconnectGoogle;
+
+  @override
+  Widget build(BuildContext context) {
+    final connected = googleConnection?.connected == true;
+
+    return _PanelCard(
+      title: 'Keep calendars moving with Toatre',
+      eyebrow: 'Sync',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Connect services one at a time. Sync starts from the moment a service is connected, so older calendar entries stay where they are.',
+            style: TextStyles.body.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _SyncProviderButton(
+                label: 'Google Calendar',
+                iconLabel: 'G',
+                active: true,
+                connected: connected,
+              ),
+              if (showIosCalendar)
+                const _SyncProviderButton(
+                  label: 'iOS Calendar',
+                  icon: Icons.calendar_month_rounded,
+                  active: false,
+                  connected: false,
+                ),
+              const _SyncProviderButton(
+                label: 'Office 365',
+                icon: Icons.business_center_rounded,
+                active: false,
+                connected: false,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _GoogleCalendarSyncCard(
+            connection: googleConnection,
+            direction: googleDirection,
+            busy: busy,
+            onDirectionChanged: onDirectionChanged,
+            onConnect: onConnectGoogle,
+            onDisconnect: onDisconnectGoogle,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SyncProviderButton extends StatelessWidget {
+  const _SyncProviderButton({
+    required this.label,
+    required this.active,
+    required this.connected,
+    this.iconLabel,
+    this.icon,
+  });
+
+  final String label;
+  final String? iconLabel;
+  final IconData? icon;
+  final bool active;
+  final bool connected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: active ? AppColors.softPurple : AppColors.bgElevated,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: active ? const Color(0x335B3DF5) : AppColors.border,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ProviderMark(iconLabel: iconLabel, icon: icon),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyles.smallMedium.copyWith(
+              color: active ? AppColors.primary : AppColors.textSecondary,
+            ),
+          ),
+          if (connected) ...[
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.check_circle_rounded,
+              size: 16,
+              color: AppColors.success,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _GoogleCalendarSyncCard extends StatelessWidget {
+  const _GoogleCalendarSyncCard({
+    required this.connection,
+    required this.direction,
+    required this.busy,
+    required this.onDirectionChanged,
+    required this.onConnect,
+    required this.onDisconnect,
+  });
+
+  final SyncConnection? connection;
+  final SyncDirection direction;
+  final bool busy;
+  final ValueChanged<SyncDirection> onDirectionChanged;
+  final VoidCallback onConnect;
+  final VoidCallback onDisconnect;
+
+  @override
+  Widget build(BuildContext context) {
+    final connected = connection?.connected == true;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.bgElevated,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _ProviderMark(iconLabel: 'G', large: true),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Google Calendar', style: TextStyles.heading3),
+                    const SizedBox(height: 4),
+                    Text(
+                      connected
+                          ? 'Connected ${_formatSyncDate(connection?.connectedAt)}'
+                          : 'Choose a direction, then connect Google Calendar.',
+                      style: TextStyles.small.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _StatusChip(
+                label: connected ? 'Connected' : 'Ready',
+                highlighted: connected,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _DirectionDiagram(direction: direction),
+          const SizedBox(height: 16),
+          Column(
+            children: [
+              _DirectionOption(
+                title: 'Google to Toatre',
+                body: 'New Google Calendar entries become Toatre toats.',
+                direction: SyncDirection.sourceToToatre,
+                value: direction,
+                onChanged: onDirectionChanged,
+              ),
+              const SizedBox(height: 10),
+              _DirectionOption(
+                title: 'Toatre to Google',
+                body: 'New scheduled Toatre toats are sent to Google Calendar.',
+                direction: SyncDirection.toatreToSource,
+                value: direction,
+                onChanged: onDirectionChanged,
+              ),
+              const SizedBox(height: 10),
+              _DirectionOption(
+                title: 'Two-way',
+                body: 'New items move both ways from now on.',
+                direction: SyncDirection.twoWay,
+                value: direction,
+                onChanged: onDirectionChanged,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Marking a toat done will not hide the original Google Calendar entry.',
+            style: TextStyles.small.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: busy
+                  ? null
+                  : connected
+                  ? onDisconnect
+                  : onConnect,
+              child: Text(
+                busy
+                    ? 'Opening Google…'
+                    : connected
+                    ? 'Pause Google Calendar sync'
+                    : 'Connect Google Calendar',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DirectionDiagram extends StatelessWidget {
+  const _DirectionDiagram({required this.direction});
+
+  final SyncDirection direction;
+
+  @override
+  Widget build(BuildContext context) {
+    final leftActive = direction != SyncDirection.toatreToSource;
+    final rightActive = direction != SyncDirection.sourceToToatre;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0x0F5B3DF5),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          const _ProviderMark(iconLabel: 'G', large: true),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.arrow_back_rounded,
+                  color: rightActive ? AppColors.primary : AppColors.textMuted,
+                ),
+                Container(
+                  width: 34,
+                  height: 2,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  color: AppColors.border,
+                ),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: leftActive ? AppColors.primary : AppColors.textMuted,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: AppColors.brandGradient,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.mic_rounded, color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DirectionOption extends StatelessWidget {
+  const _DirectionOption({
+    required this.title,
+    required this.body,
+    required this.direction,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String body;
+  final SyncDirection direction;
+  final SyncDirection value;
+  final ValueChanged<SyncDirection> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = direction == value;
+
+    return GestureDetector(
+      onTap: () => onChanged(direction),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.softPurple : AppColors.bg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? const Color(0x335B3DF5) : AppColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: selected ? AppColors.primary : AppColors.textMuted,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyles.bodyMedium),
+                  const SizedBox(height: 4),
+                  Text(body, style: TextStyles.small),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProviderMark extends StatelessWidget {
+  const _ProviderMark({this.iconLabel, this.icon, this.large = false});
+
+  final String? iconLabel;
+  final IconData? icon;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = large ? 48.0 : 28.0;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(large ? 16 : 10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Center(
+        child: iconLabel != null
+            ? Text(
+                iconLabel!,
+                style: TextStyles.bodyMedium.copyWith(
+                  color: const Color(0xFF4285F4),
+                  fontSize: large ? 24 : 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              )
+            : Icon(
+                icon ?? Icons.sync_rounded,
+                color: AppColors.textSecondary,
+                size: large ? 24 : 16,
+              ),
+      ),
+    );
+  }
+}
+
+String _formatSyncDate(DateTime? value) {
+  if (value == null) {
+    return 'just now';
+  }
+  return DateFormat.MMMd().add_jm().format(value);
 }
 
 class _PanelCard extends StatelessWidget {

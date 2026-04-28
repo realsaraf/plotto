@@ -22,6 +22,14 @@
 
 **Implementation note:** Code delivery has advanced into Phases 1–3 on web and mobile while several external account/dashboard steps in Phase 0 still remain open.
 
+### Session 2026-04-27 (settings sync surface) — completed
+- Added a Settings → Sync tab on mobile and web, starting with Google Calendar as the active provider plus placeholders for iOS Calendar and Office 365
+- Collapsed settings navigation to three tabs on both mobile and web: General, Pings, and Sync; Handle and Phone settings now live inside General
+- Added Google Calendar sync direction controls for Google → Toatre, Toatre → Google, and two-way, with copy clarifying that sync starts only from the connection time and does not hide source calendar entries when a toat is marked done
+- Persisted sync connection state through the shared `/api/settings` payload via `syncConnections`, including provider, direction, connected state, connection timestamp, and forward-only start timestamp
+- Wired mobile Google Calendar connect to request the Google Calendar scope through `google_sign_in`; wired web connect to request the same scope through Firebase popup/link/reauth
+- Validation: `flutter analyze`, `flutter test`, `npm run typecheck`, `npm run build`
+
 ### Session 2026-04-26 (mobile parity + Android build unblocking) — completed
 - Brought the Flutter mobile app much closer to the current web surface: tappable timeline cards, a full toat detail screen with quick actions, typed capture mode, a smaller empty-state capture CTA, and a real settings/profile flow for General, Phone, Handle, and Pings
 - Expanded the mobile data layer with settings models/provider support plus toat fetch/update/delete/duplicate helpers and capture-mode handling so the new UI is backed by the existing web APIs
