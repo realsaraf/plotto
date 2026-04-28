@@ -24,7 +24,7 @@ export async function requireUser(
     return {
       user: null,
       errorResponse: NextResponse.json(
-        { error: "Missing Authorization header" },
+        { error: "Missing Authorization header", v: "v2-mongo-trycatch" },
         { status: 401 }
       ),
     };
