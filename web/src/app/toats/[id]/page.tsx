@@ -31,13 +31,13 @@ import {
   UserAvatar,
   VideoGlyph,
 } from "@/components/mobile-ui";
+import type { ToatTemplate, TemplateData } from "@/types";
 
-type ToatKind = "task" | "event" | "meeting" | "errand" | "deadline" | "idea";
 type ToatTier = "urgent" | "important" | "regular";
 
 interface ToatDetail {
   id: string;
-  kind: ToatKind;
+  template: ToatTemplate;
   tier: ToatTier;
   title: string;
   datetime: string | null;
@@ -48,6 +48,7 @@ interface ToatDetail {
   notes: string | null;
   status: string;
   captureId: string | null;
+  templateData: TemplateData;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,8 +67,6 @@ interface ActionConfig {
   href: string;
   external: boolean;
 }
-
-type DetailVariant = "appointment" | "checklist" | "meeting" | "event" | "general";
 
 function formatTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -112,120 +111,75 @@ function formatRelativeChip(toat: ToatDetail, now: Date) {
   return { text: formatShortDate(start), style: "outline" as const };
 }
 
-function normalizeText(toat: ToatDetail) {
-  return `${toat.title} ${toat.notes ?? ""}`.toLowerCase();
-}
-
-function extractPhone(toat: ToatDetail) {
-  const match = `${toat.title} ${toat.notes ?? ""}`.match(/(\+?\d[\d\s().-]{7,}\d)/);
-  return match ? match[1] : null;
-}
-
 function mapHref(location: string | null) {
   if (!location) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
 }
 
-function getVariant(toat: ToatDetail): DetailVariant {
-  const text = normalizeText(toat);
-  if (toat.kind === "meeting" || /meet|standup|sync|zoom|google meet/.test(text)) return "meeting";
-  if (toat.kind === "event") return "event";
-  if (/grocer|shopping|buy /.test(text)) return "checklist";
-  if (/dentist|doctor|clinic|appointment|check-up/.test(text) || toat.kind === "errand") return "appointment";
-  return "general";
+// ─── Template-based visual + action dispatch ──────────────────────────────────
+
+interface DetailVisual {
+  kicker: string;
+  gradient: string;
+  soft: string;
+  accent: string;
+  Icon: React.ComponentType<{ size?: number; color?: string }>;
 }
 
-function getVisual(toat: ToatDetail) {
-  const text = normalizeText(toat);
+const TEMPLATE_VISUAL: Record<ToatTemplate, DetailVisual> = {
+  meeting:    { kicker: "Meeting",    gradient: "linear-gradient(135deg, #3B82F6, #2563EB)", soft: "rgba(59,130,246,0.12)",   accent: "#2563EB", Icon: VideoGlyph },
+  call:       { kicker: "Call",       gradient: "linear-gradient(135deg, #F43F5E, #EC4899)", soft: "rgba(236,72,153,0.12)",   accent: "#DB2777", Icon: PhoneGlyph },
+  appointment:{ kicker: "Appointment",gradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)", soft: "rgba(139,92,246,0.12)",   accent: "#6D28D9", Icon: ToothGlyph },
+  event:      { kicker: "Event",      gradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)", soft: "rgba(124,58,237,0.12)",   accent: "#6D28D9", Icon: TicketGlyph },
+  deadline:   { kicker: "Deadline",   gradient: "linear-gradient(135deg, #EF4444, #DC2626)", soft: "rgba(239,68,68,0.12)",    accent: "#DC2626", Icon: ClockIcon },
+  task:       { kicker: "Task",       gradient: "linear-gradient(135deg, #F97316, #FB923C)", soft: "rgba(249,115,22,0.12)",   accent: "#EA580C", Icon: EnvelopeGlyph },
+  checklist:  { kicker: "Checklist",  gradient: "linear-gradient(135deg, #22C55E, #16A34A)", soft: "rgba(34,197,94,0.12)",    accent: "#16A34A", Icon: CartGlyph },
+  errand:     { kicker: "Errand",     gradient: "linear-gradient(135deg, #8B5CF6, #7C3AED)", soft: "rgba(139,92,246,0.12)",   accent: "#6D28D9", Icon: CartGlyph },
+  follow_up:  { kicker: "Follow-up",  gradient: "linear-gradient(135deg, #06B6D4, #0891B2)", soft: "rgba(6,182,212,0.12)",    accent: "#0891B2", Icon: MessageGlyph },
+  idea:       { kicker: "Idea",       gradient: "linear-gradient(135deg, #F59E0B, #FBBF24)", soft: "rgba(245,158,11,0.12)",   accent: "#D97706", Icon: BulbGlyph },
+};
 
-  if (/dentist|doctor|clinic|appointment|check-up/.test(text) || toat.kind === "errand") {
-    return {
-      kicker: "Appointment",
-      gradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
-      soft: "rgba(139,92,246,0.12)",
-      accent: "#6D28D9",
-      Icon: ToothGlyph,
-    };
-  }
-
-  if (toat.kind === "meeting" || /meet|standup|sync|zoom|google meet/.test(text)) {
-    return {
-      kicker: "Meeting",
-      gradient: "linear-gradient(135deg, #3B82F6, #2563EB)",
-      soft: "rgba(59,130,246,0.12)",
-      accent: "#2563EB",
-      Icon: VideoGlyph,
-    };
-  }
-
-  if (/grocer|shopping|buy /.test(text)) {
-    return {
-      kicker: "Errand",
-      gradient: "linear-gradient(135deg, #22C55E, #16A34A)",
-      soft: "rgba(34,197,94,0.12)",
-      accent: "#16A34A",
-      Icon: CartGlyph,
-    };
-  }
-
-  if (toat.kind === "event") {
-    return {
-      kicker: "Event",
-      gradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
-      soft: "rgba(124,58,237,0.12)",
-      accent: "#6D28D9",
-      Icon: TicketGlyph,
-    };
-  }
-
-  if (/call /.test(text)) {
-    return {
-      kicker: "Call",
-      gradient: "linear-gradient(135deg, #F43F5E, #EC4899)",
-      soft: "rgba(236,72,153,0.12)",
-      accent: "#DB2777",
-      Icon: PhoneGlyph,
-    };
-  }
-
-  if (/email|send|deck|message/.test(text)) {
-    return {
-      kicker: "Task",
-      gradient: "linear-gradient(135deg, #F97316, #FB923C)",
-      soft: "rgba(249,115,22,0.12)",
-      accent: "#EA580C",
-      Icon: EnvelopeGlyph,
-    };
-  }
-
-  return {
-    kicker: toat.kind === "idea" ? "Idea" : "Toat",
-    gradient: "linear-gradient(135deg, #F59E0B, #FBBF24)",
-    soft: "rgba(245,158,11,0.12)",
-    accent: "#D97706",
-    Icon: BulbGlyph,
-  };
+function getVisual(toat: ToatDetail): DetailVisual {
+  return TEMPLATE_VISUAL[toat.template] ?? TEMPLATE_VISUAL.task;
 }
 
 function getPrimaryAction(toat: ToatDetail): ActionConfig {
-  const variant = getVariant(toat);
-  const phone = extractPhone(toat);
+  const td = toat.templateData;
   const directions = mapHref(toat.location);
 
-  if (variant === "meeting" && toat.link) {
-    return { label: "Join now", href: toat.link, external: true };
-  }
-
-  if (variant === "event" && toat.link) {
-    return { label: "View tickets", href: toat.link, external: true };
-  }
-
-  if (phone) {
-    return { label: "Call", href: `tel:${phone.replace(/\s+/g, "")}`, external: true };
-  }
-
-  if (directions) {
-    return { label: "Directions", href: directions, external: true };
+  switch (toat.template) {
+    case "meeting": {
+      const url = (td as { template: "meeting"; joinUrl: string | null }).joinUrl ?? toat.link;
+      if (url) return { label: "Join now", href: url, external: true };
+      break;
+    }
+    case "call": {
+      const phone = (td as { template: "call"; phone: string | null }).phone;
+      if (phone) return { label: "Call", href: `tel:${phone.replace(/\s+/g, "")}`, external: true };
+      break;
+    }
+    case "event": {
+      const ticketUrl = (td as { template: "event"; ticketUrl: string | null }).ticketUrl ?? toat.link;
+      if (ticketUrl) return { label: "View tickets", href: ticketUrl, external: true };
+      if (directions) return { label: "Directions", href: directions, external: true };
+      break;
+    }
+    case "appointment":
+    case "errand": {
+      const addr = (td as { address: string | null }).address;
+      const href = mapHref(addr ?? toat.location);
+      if (href) return { label: "Directions", href, external: true };
+      break;
+    }
+    case "follow_up": {
+      const fud = td as { template: "follow_up"; phone: string | null; email: string | null; channel: string | null };
+      if (fud.channel === "call" && fud.phone) return { label: "Call", href: `tel:${fud.phone.replace(/\s+/g, "")}`, external: true };
+      if (fud.channel === "email" && fud.email) return { label: "Email", href: `mailto:${fud.email}`, external: true };
+      if (fud.phone) return { label: "Call", href: `tel:${fud.phone.replace(/\s+/g, "")}`, external: true };
+      break;
+    }
+    default:
+      if (directions) return { label: "Directions", href: directions, external: true };
   }
 
   return { label: "Open details", href: `/toats/${toat.id}`, external: false };
@@ -240,13 +194,22 @@ function parseAgenda(notes: string | null) {
     .slice(0, 5);
 }
 
-function parseChecklist(notes: string | null) {
-  if (!notes) return [];
-  return notes
-    .split(/\r?\n|,|;/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 12);
+/** For meetings: derive agenda lines from templateData.agenda or fall back to notes */
+function getAgendaLines(toat: ToatDetail) {
+  if (toat.template === "meeting") {
+    const md = toat.templateData as { template: "meeting"; agenda: string | null };
+    if (md.agenda) return parseAgenda(md.agenda);
+  }
+  return parseAgenda(toat.notes);
+}
+
+/** For checklists: use real items from templateData */
+function getChecklistItems(toat: ToatDetail): Array<{ id: string; text: string; done: boolean }> {
+  if (toat.template === "checklist") {
+    const cd = toat.templateData as { template: "checklist"; items: Array<{ id: string; text: string; done: boolean }> };
+    return cd.items;
+  }
+  return [];
 }
 
 function buildReminderLines(toat: ToatDetail) {
@@ -519,7 +482,7 @@ export default function ToatDetailPage() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        kind: toat.kind,
+        template: toat.template,
         tier: toat.tier,
         title: `${toat.title} copy`,
         datetime: toat.datetime,
@@ -528,6 +491,7 @@ export default function ToatDetailPage() {
         link: toat.link,
         people: toat.people,
         notes: toat.notes,
+        templateData: toat.templateData,
       }),
     });
 
@@ -650,17 +614,23 @@ export default function ToatDetailPage() {
   }
 
   const visual = getVisual(toat);
-  const variant = getVariant(toat);
   const Icon = visual.Icon;
   const heroChip = formatRelativeChip(toat, now);
   const primaryAction = getPrimaryAction(toat);
   const reminders = buildReminderLines(toat);
-  const agenda = parseAgenda(toat.notes);
-  const checklistItems = parseChecklist(toat.notes);
+  const agenda = getAgendaLines(toat);
+  const checklistItems = getChecklistItems(toat);
   const ticketDigits = qrDigits(toat.id);
   const startDate = toat.datetime ? new Date(toat.datetime) : null;
   const endDate = toat.endDatetime ? new Date(toat.endDatetime) : null;
-  const phone = extractPhone(toat);
+  // Phone: typed from templateData, not regex-scraped from notes
+  const phone = (() => {
+    const td = toat.templateData;
+    if (td.template === "call") return td.phone;
+    if (td.template === "appointment") return td.phone;
+    if (td.template === "follow_up") return td.phone;
+    return null;
+  })();
   const maps = mapHref(toat.location);
   const isPhoneViewport = viewportWidth === null || viewportWidth <= 768;
 
@@ -704,12 +674,12 @@ export default function ToatDetailPage() {
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={styles.heroKickerRow}>
-              {variant === "appointment" ? <span style={{ ...styles.heroKicker, color: visual.accent }}>• {visual.kicker.toUpperCase()}</span> : null}
+              {toat.template === "appointment" ? <span style={{ ...styles.heroKicker, color: visual.accent }}>• {visual.kicker.toUpperCase()}</span> : null}
               {heroChip ? <DetailBadge text={heroChip.text} style={heroChip.style} accent={visual.accent} /> : null}
             </div>
             <h1 style={{ ...styles.heroTitle, ...(isPhoneViewport ? styles.heroTitleCompact : {}) }}>{toat.title}</h1>
 
-            {variant === "meeting" ? (
+            {toat.template === "meeting" ? (
               <div style={styles.heroMeetingMeta}>
                 <span style={{ ...styles.heroMetaChip, ...(isPhoneViewport ? styles.heroMetaChipCompact : {}) }}><VideoGlyph size={isPhoneViewport ? 16 : 20} /> {toat.link ? "Meeting link" : "Meeting"}</span>
                 {toat.people.length ? (
@@ -724,20 +694,20 @@ export default function ToatDetailPage() {
             ) : null}
 
             {toat.location ? <p style={{ ...styles.heroLocation, ...(isPhoneViewport ? styles.heroLocationCompact : {}) }}><LocationIcon size={isPhoneViewport ? 18 : 22} /> {toat.location}</p> : null}
-            {variant === "event" && toat.link ? <p style={{ ...styles.heroSecondary, ...(isPhoneViewport ? styles.heroSecondaryCompact : {}) }}><TicketGlyph size={isPhoneViewport ? 16 : 20} /> Tickets ready</p> : null}
-            {variant === "general" && startDate ? <p style={{ ...styles.heroSecondary, ...(isPhoneViewport ? styles.heroSecondaryCompact : {}) }}><ClockIcon size={isPhoneViewport ? 16 : 20} /> {formatDate(startDate)}</p> : null}
+            {toat.template === "event" && toat.link ? <p style={{ ...styles.heroSecondary, ...(isPhoneViewport ? styles.heroSecondaryCompact : {}) }}><TicketGlyph size={isPhoneViewport ? 16 : 20} /> Tickets ready</p> : null}
+            {(toat.template === "task" || toat.template === "idea" || toat.template === "deadline") && startDate ? <p style={{ ...styles.heroSecondary, ...(isPhoneViewport ? styles.heroSecondaryCompact : {}) }}><ClockIcon size={isPhoneViewport ? 16 : 20} /> {formatDate(startDate)}</p> : null}
           </div>
         </section>
 
         {flash ? <div style={styles.flash}>{flash}</div> : null}
 
-        {variant === "meeting" ? (
+        {toat.template === "meeting" ? (
           <button type="button" onClick={openPrimaryAction} style={{ ...styles.fullWidthPrimary, ...(isPhoneViewport ? styles.fullWidthPrimaryCompact : {}), background: visual.gradient }}>
             <VideoGlyph size={isPhoneViewport ? 20 : 24} /> {primaryAction.label}
           </button>
         ) : null}
 
-        {variant === "appointment" || variant === "general" ? (
+        {(toat.template === "appointment" || toat.template === "task" || toat.template === "deadline" || toat.template === "follow_up" || toat.template === "idea") ? (
           <>
             <SectionCard title="When & where" action={<button type="button" style={styles.inlineGhost}><EditIcon size={18} /> Edit</button>}>
               {startDate ? (
@@ -811,7 +781,7 @@ export default function ToatDetailPage() {
           </>
         ) : null}
 
-        {variant === "meeting" ? (
+        {toat.template === "meeting" ? (
           <>
             <SectionCard title="Meeting details">
               {startDate ? <InfoRow icon={<ClockIcon size={22} />} label="When" title={`${formatDate(startDate)} · ${formatTime(startDate)}`} subtitle={endDate ? `Ends at ${formatTime(endDate)}` : null} /> : null}
@@ -856,7 +826,7 @@ export default function ToatDetailPage() {
           </>
         ) : null}
 
-        {variant === "event" ? (
+        {toat.template === "event" ? (
           <>
             {startDate ? (
               <section style={styles.dualMetricCard}>
@@ -922,7 +892,7 @@ export default function ToatDetailPage() {
           </>
         ) : null}
 
-        {variant === "checklist" ? (
+        {toat.template === "checklist" ? (
           <>
             <section style={styles.summaryStrip}>
               <SummaryTile accent={visual.accent} title={`${checklistItems.length}`} subtitle="items" value={`${checklistItems.length}`} />
@@ -930,18 +900,18 @@ export default function ToatDetailPage() {
               <SummaryTile accent={visual.accent} title={toat.location ?? "For me"} subtitle="where" value={toat.people[0] ?? "Personal"} />
             </section>
 
-            <SectionCard title="Shopping list" action={<button type="button" style={styles.inlineGhost}><EditIcon size={18} /> Edit</button>}>
+            <SectionCard title="Checklist" action={<button type="button" style={styles.inlineGhost}><EditIcon size={18} /> Edit</button>}>
               {checklistItems.length ? (
                 <div style={styles.checklist}>
                   {checklistItems.map((item) => (
-                    <div key={item} style={styles.checklistRow}>
-                      <span style={styles.checkCircle} />
-                      <span style={styles.checkLabel}>{item}</span>
+                    <div key={item.id} style={styles.checklistRow}>
+                      <span style={{ ...styles.checkCircle, ...(item.done ? { background: visual.accent } : {}) }} />
+                      <span style={{ ...styles.checkLabel, ...(item.done ? { textDecoration: "line-through", opacity: 0.5 } : {}) }}>{item.text}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p style={styles.bodyText}>Add line-separated notes to turn this into a richer checklist.</p>
+                <p style={styles.bodyText}>No items yet.</p>
               )}
             </SectionCard>
 
@@ -975,7 +945,7 @@ export default function ToatDetailPage() {
           </>
         ) : null}
 
-        {variant === "general" ? (
+        {(toat.template === "task" || toat.template === "deadline" || toat.template === "idea" || toat.template === "follow_up") ? (
           <>
             <SectionCard title="Details">
               {startDate ? <InfoRow icon={<ClockIcon size={22} />} label="When" title={formatDate(startDate)} subtitle={formatTime(startDate)} /> : null}
@@ -999,7 +969,7 @@ export default function ToatDetailPage() {
           </SectionCard>
         ) : null}
 
-        {variant !== "meeting" ? (
+        {toat.template !== "meeting" ? (
           <section style={styles.tipCard}>
             <span style={styles.tipSpark}><SparkleIcon size={20} /></span>
             <p style={styles.tipText}>Toatre will keep this toat on track with your Pings and the timing you already set.</p>

@@ -1068,13 +1068,13 @@ class _UpNextCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              _kindColors(toat.kind).first.withValues(alpha: 0.10),
-              _kindColors(toat.kind).last.withValues(alpha: 0.06),
+              _templateColors(toat.template).first.withValues(alpha: 0.10),
+              _templateColors(toat.template).last.withValues(alpha: 0.06),
             ],
           ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: _kindColors(toat.kind).last.withValues(alpha: 0.18),
+            color: _templateColors(toat.template).last.withValues(alpha: 0.18),
           ),
         ),
         child: Row(
@@ -1085,9 +1085,9 @@ class _UpNextCard extends StatelessWidget {
               height: 44,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
-                gradient: LinearGradient(colors: _kindColors(toat.kind)),
+                gradient: LinearGradient(colors: _templateColors(toat.template)),
               ),
-              child: Icon(_kindIcon(toat.kind), color: Colors.white, size: 21),
+              child: Icon(_templateIcon(toat.template), color: Colors.white, size: 21),
             ),
             const SizedBox(width: 9),
             Expanded(
@@ -1159,7 +1159,7 @@ class _UpNextCard extends StatelessWidget {
                     Text(
                       _timeToGo(toat.datetime!),
                       style: TextStyles.tiny.copyWith(
-                        color: _kindColors(toat.kind).last,
+                        color: _templateColors(toat.template).last,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1262,11 +1262,11 @@ class _TimelineRow extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         gradient: LinearGradient(
-                          colors: _kindColors(toat.kind),
+                          colors: _templateColors(toat.template),
                         ),
                       ),
                       child: Icon(
-                        _kindIcon(toat.kind),
+                        _templateIcon(toat.template),
                         color: Colors.white,
                         size: 20,
                       ),
@@ -1493,42 +1493,64 @@ class _BottomItem extends StatelessWidget {
   }
 }
 
-List<Color> _kindColors(String kind) {
-  switch (kind) {
+// Template-based color dispatch
+List<Color> _templateColors(String template) {
+  switch (template) {
     case 'meeting':
       return const [Color(0xFF3B82F6), Color(0xFF2563EB)];
+    case 'call':
+      return const [Color(0xFFF43F5E), Color(0xFFEC4899)];
+    case 'appointment':
+      return const [Color(0xFF7C3AED), Color(0xFF5B3DF5)];
+    case 'event':
+      return const [Color(0xFF7C3AED), Color(0xFF5B3DF5)];
+    case 'deadline':
+      return const [Color(0xFFEF4444), Color(0xFFDC2626)];
+    case 'checklist':
+      return const [Color(0xFF22C55E), Color(0xFF16A34A)];
     case 'errand':
       return const [Color(0xFFA855F7), Color(0xFF8B5CF6)];
+    case 'follow_up':
+      return const [Color(0xFF06B6D4), Color(0xFF0891B2)];
     case 'idea':
       return const [Color(0xFFFBBF24), Color(0xFFF59E0B)];
-    case 'deadline':
-      return const [Color(0xFFFB7185), Color(0xFFEC4899)];
-    default:
+    default: // task
       return const [Color(0xFFF97316), Color(0xFFF59E0B)];
   }
 }
 
-IconData _kindIcon(String kind) {
-  switch (kind) {
+// Template-based icon dispatch
+IconData _templateIcon(String template) {
+  switch (template) {
     case 'meeting':
       return Icons.videocam_rounded;
+    case 'call':
+      return Icons.call_rounded;
+    case 'appointment':
+      return Icons.medical_services_outlined;
+    case 'event':
+      return Icons.confirmation_number_outlined;
+    case 'deadline':
+      return Icons.timer_outlined;
+    case 'checklist':
+      return Icons.checklist_rounded;
     case 'errand':
       return Icons.shopping_cart_outlined;
+    case 'follow_up':
+      return Icons.replay_rounded;
     case 'idea':
       return Icons.lightbulb_outline_rounded;
-    case 'deadline':
-      return Icons.call_rounded;
-    default:
+    default: // task
       return Icons.mail_outline_rounded;
   }
 }
 
 String _supportingText(ToatSummary toat) {
-  final phone = _extractPhone(toat);
+  final phone = _templatePhone(toat);
   if (phone != null) {
     return phone;
   }
-  if (toat.link != null && toat.link!.isNotEmpty && toat.kind == 'meeting') {
+  if (toat.link != null && toat.link!.isNotEmpty && toat.template == 'meeting') {
     return _meetingPlatform(toat.link!);
   }
   if (toat.location != null && toat.location!.isNotEmpty) {
@@ -1559,20 +1581,24 @@ String _meetingPlatform(String link) {
   return 'Meeting link';
 }
 
-String? _extractPhone(ToatSummary toat) {
-  final haystack = <String?>[
-    toat.title,
-    toat.notes,
-    toat.location,
-    toat.link,
-    ...toat.people,
-  ].whereType<String>().join(' ');
-  final match = RegExp(r'(\+?\d[\d\s().-]{7,}\d)').firstMatch(haystack);
-  return match?.group(1);
+/// Returns the phone number from typed templateData — no regex needed.
+String? _templatePhone(ToatSummary toat) {
+  final td = toat.templateData;
+  switch (toat.template) {
+    case 'call':
+    case 'appointment':
+    case 'follow_up':
+      final phone = td['phone'];
+      if (phone is String && phone.isNotEmpty) return phone;
+      break;
+    default:
+      break;
+  }
+  return null;
 }
 
 _TimelineAction? _primaryAction(ToatSummary toat) {
-  final phone = _extractPhone(toat);
+  final phone = _templatePhone(toat);
   if (phone != null) {
     return _TimelineAction(
       label: 'Call',
@@ -1582,16 +1608,21 @@ _TimelineAction? _primaryAction(ToatSummary toat) {
     );
   }
 
-  if (toat.kind == 'meeting' && toat.link != null && toat.link!.isNotEmpty) {
-    return _TimelineAction(
-      label: 'Join',
-      icon: Icons.videocam_rounded,
-      uri: _externalUri(toat.link!),
-      type: _TimelineActionType.meeting,
-    );
+  if (toat.template == 'meeting') {
+    final joinUrl = toat.templateData['joinUrl'] as String?;
+    final link = joinUrl?.isNotEmpty == true ? joinUrl : toat.link;
+    if (link != null && link.isNotEmpty) {
+      return _TimelineAction(
+        label: 'Join',
+        icon: Icons.videocam_rounded,
+        uri: _externalUri(link),
+        type: _TimelineActionType.meeting,
+      );
+    }
   }
 
-  if ((toat.kind == 'errand' || toat.location != null) &&
+  if ((toat.template == 'errand' || toat.template == 'appointment' ||
+       toat.location != null) &&
       toat.location != null &&
       toat.location!.isNotEmpty) {
     return _TimelineAction(

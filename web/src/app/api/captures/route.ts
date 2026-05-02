@@ -133,11 +133,15 @@ export async function POST(request: NextRequest) {
   });
   const captureId = captureResult.insertedId;
 
+  // Import helpers here to avoid circular imports at module-level
+  const { templateToKind, emptyTemplateData } = await import("@/types");
+
   // Insert toats
   const toatDocs = extraction.toats.map((t) => ({
     ownerId,
     captureId,
-    kind: t.kind,
+    template: t.template,
+    kind: templateToKind(t.template),
     tier: t.tier,
     title: t.title,
     datetime: t.datetime ? new Date(t.datetime) : null,
@@ -146,6 +150,7 @@ export async function POST(request: NextRequest) {
     link: t.link ?? null,
     people: t.people ?? [],
     notes: t.notes ?? null,
+    templateData: t.templateData ?? emptyTemplateData(t.template),
     status: "active",
     createdAt: now,
     updatedAt: now,
@@ -167,7 +172,6 @@ export async function POST(request: NextRequest) {
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
   }));
-
   return NextResponse.json({
     captureId: captureId.toString(),
     transcript,

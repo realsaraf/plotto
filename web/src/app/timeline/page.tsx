@@ -28,13 +28,13 @@ import {
   UserAvatar,
   VideoGlyph,
 } from "@/components/mobile-ui";
+import type { ToatTemplate, TemplateData } from "@/types";
 
-type ToatKind = "task" | "event" | "meeting" | "errand" | "deadline" | "idea";
 type ToatTier = "urgent" | "important" | "regular";
 
 interface TimelineToat {
   id: string;
-  kind: ToatKind;
+  template: ToatTemplate;
   tier: ToatTier;
   title: string;
   datetime: string | null;
@@ -45,6 +45,7 @@ interface TimelineToat {
   notes: string | null;
   status: string;
   captureId: string | null;
+  templateData: TemplateData;
   createdAt: string;
   updatedAt: string;
 }
@@ -157,124 +158,136 @@ function formatMinutesLabel(minutes: number) {
   return remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`;
 }
 
-function extractPhone(toat: TimelineToat) {
-  const match = `${toat.title} ${toat.notes ?? ""}`.match(/(\+?\d[\d\s().-]{7,}\d)/);
-  return match ? match[1] : null;
-}
-
 function mapHref(location: string | null) {
   if (!location) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
 }
 
-function normalizeKeywords(text: string) {
-  return text.toLowerCase();
+// ─── Template-based visual config ─────────────────────────────────────────────
+
+interface ToatVisual {
+  label: string;
+  cardGradient: string;
+  iconTint: string;
+  softTint: string;
+  actionLabel: string;
+  actionBackground: string;
+  actionColor: string;
+  Icon: React.ComponentType<{ size?: number; color?: string }>;
 }
 
-function getToatVisual(toat: TimelineToat) {
-  const text = normalizeKeywords(`${toat.title} ${toat.notes ?? ""}`);
-
-  if (/dentist|doctor|clinic|appointment|check-up/.test(text)) {
-    return {
-      label: "Appointment",
-      cardGradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
-      iconTint: "#8B5CF6",
-      softTint: "rgba(139,92,246,0.12)",
-      actionLabel: "Directions",
-      actionBackground: "rgba(139,92,246,0.12)",
-      actionColor: "#6D28D9",
-      Icon: ToothGlyph,
-    };
-  }
-
-  if (toat.kind === "meeting" || /meet|standup|sync|zoom|google meet|call with/.test(text)) {
-    return {
-      label: "Meeting",
-      cardGradient: "linear-gradient(135deg, #3B82F6, #2563EB)",
-      iconTint: "#3B82F6",
-      softTint: "rgba(59,130,246,0.12)",
-      actionLabel: "Join",
-      actionBackground: "rgba(59,130,246,0.12)",
-      actionColor: "#2563EB",
-      Icon: VideoGlyph,
-    };
-  }
-
-  if (/call /.test(text) || /phone/.test(text)) {
-    return {
-      label: "Call",
-      cardGradient: "linear-gradient(135deg, #F43F5E, #EC4899)",
-      iconTint: "#EC4899",
-      softTint: "rgba(236,72,153,0.12)",
-      actionLabel: "Call",
-      actionBackground: "rgba(236,72,153,0.12)",
-      actionColor: "#DB2777",
-      Icon: PhoneGlyph,
-    };
-  }
-
-  if (/email|send|deck|message/.test(text)) {
-    return {
-      label: "Task",
-      cardGradient: "linear-gradient(135deg, #F97316, #FB923C)",
-      iconTint: "#F97316",
-      softTint: "rgba(249,115,22,0.12)",
-      actionLabel: "Message",
-      actionBackground: "rgba(249,115,22,0.12)",
-      actionColor: "#EA580C",
-      Icon: EnvelopeGlyph,
-    };
-  }
-
-  if (/grocer|shopping|buy /.test(text)) {
-    return {
-      label: "Errand",
-      cardGradient: "linear-gradient(135deg, #8B5CF6, #7C3AED)",
-      iconTint: "#8B5CF6",
-      softTint: "rgba(139,92,246,0.12)",
-      actionLabel: "Directions",
-      actionBackground: "rgba(139,92,246,0.12)",
-      actionColor: "#6D28D9",
-      Icon: CartGlyph,
-    };
-  }
-
-  if (toat.kind === "event") {
-    return {
-      label: "Event",
-      cardGradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
-      iconTint: "#7C3AED",
-      softTint: "rgba(124,58,237,0.12)",
-      actionLabel: "Tickets",
-      actionBackground: "rgba(124,58,237,0.12)",
-      actionColor: "#6D28D9",
-      Icon: TicketGlyph,
-    };
-  }
-
-  if (toat.kind === "idea" || /read|idea|brainstorm|note/.test(text)) {
-    return {
-      label: "Idea",
-      cardGradient: "linear-gradient(135deg, #F59E0B, #FBBF24)",
-      iconTint: "#F59E0B",
-      softTint: "rgba(245,158,11,0.12)",
-      actionLabel: "Open",
-      actionBackground: "rgba(245,158,11,0.12)",
-      actionColor: "#D97706",
-      Icon: BulbGlyph,
-    };
-  }
-
-  return {
-    label: toat.kind === "deadline" ? "Deadline" : "Task",
-    cardGradient: "linear-gradient(135deg, #8B5CF6, #EC4899)",
-    iconTint: "#8B5CF6",
-    softTint: "rgba(139,92,246,0.12)",
-    actionLabel: "Open",
-    actionBackground: "rgba(139,92,246,0.12)",
-    actionColor: "#6D28D9",
+const TEMPLATE_VISUAL: Record<ToatTemplate, ToatVisual> = {
+  meeting: {
+    label: "Meeting", cardGradient: "linear-gradient(135deg, #3B82F6, #2563EB)",
+    iconTint: "#3B82F6", softTint: "rgba(59,130,246,0.12)",
+    actionLabel: "Join", actionBackground: "rgba(59,130,246,0.12)", actionColor: "#2563EB",
+    Icon: VideoGlyph,
+  },
+  call: {
+    label: "Call", cardGradient: "linear-gradient(135deg, #F43F5E, #EC4899)",
+    iconTint: "#EC4899", softTint: "rgba(236,72,153,0.12)",
+    actionLabel: "Call", actionBackground: "rgba(236,72,153,0.12)", actionColor: "#DB2777",
+    Icon: PhoneGlyph,
+  },
+  appointment: {
+    label: "Appointment", cardGradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
+    iconTint: "#8B5CF6", softTint: "rgba(139,92,246,0.12)",
+    actionLabel: "Directions", actionBackground: "rgba(139,92,246,0.12)", actionColor: "#6D28D9",
+    Icon: ToothGlyph,
+  },
+  event: {
+    label: "Event", cardGradient: "linear-gradient(135deg, #7C3AED, #5B3DF5)",
+    iconTint: "#7C3AED", softTint: "rgba(124,58,237,0.12)",
+    actionLabel: "Tickets", actionBackground: "rgba(124,58,237,0.12)", actionColor: "#6D28D9",
+    Icon: TicketGlyph,
+  },
+  deadline: {
+    label: "Deadline", cardGradient: "linear-gradient(135deg, #EF4444, #DC2626)",
+    iconTint: "#EF4444", softTint: "rgba(239,68,68,0.12)",
+    actionLabel: "Open", actionBackground: "rgba(239,68,68,0.12)", actionColor: "#DC2626",
+    Icon: ClockIcon,
+  },
+  task: {
+    label: "Task", cardGradient: "linear-gradient(135deg, #F97316, #FB923C)",
+    iconTint: "#F97316", softTint: "rgba(249,115,22,0.12)",
+    actionLabel: "Open", actionBackground: "rgba(249,115,22,0.12)", actionColor: "#EA580C",
+    Icon: EnvelopeGlyph,
+  },
+  checklist: {
+    label: "Checklist", cardGradient: "linear-gradient(135deg, #22C55E, #16A34A)",
+    iconTint: "#22C55E", softTint: "rgba(34,197,94,0.12)",
+    actionLabel: "Open", actionBackground: "rgba(34,197,94,0.12)", actionColor: "#16A34A",
+    Icon: CartGlyph,
+  },
+  errand: {
+    label: "Errand", cardGradient: "linear-gradient(135deg, #8B5CF6, #7C3AED)",
+    iconTint: "#8B5CF6", softTint: "rgba(139,92,246,0.12)",
+    actionLabel: "Directions", actionBackground: "rgba(139,92,246,0.12)", actionColor: "#6D28D9",
+    Icon: CartGlyph,
+  },
+  follow_up: {
+    label: "Follow-up", cardGradient: "linear-gradient(135deg, #06B6D4, #0891B2)",
+    iconTint: "#06B6D4", softTint: "rgba(6,182,212,0.12)",
+    actionLabel: "Call", actionBackground: "rgba(6,182,212,0.12)", actionColor: "#0891B2",
     Icon: MessageGlyph,
-  };
+  },
+  idea: {
+    label: "Idea", cardGradient: "linear-gradient(135deg, #F59E0B, #FBBF24)",
+    iconTint: "#F59E0B", softTint: "rgba(245,158,11,0.12)",
+    actionLabel: "Open", actionBackground: "rgba(245,158,11,0.12)", actionColor: "#D97706",
+    Icon: BulbGlyph,
+  },
+};
+
+function getToatVisual(toat: TimelineToat): ToatVisual {
+  return TEMPLATE_VISUAL[toat.template] ?? TEMPLATE_VISUAL.task;
+}
+
+function getPrimaryAction(toat: TimelineToat) {
+  const td = toat.templateData;
+  const directions = mapHref(toat.location);
+
+  switch (toat.template) {
+    case "meeting": {
+      const url = (td as { template: "meeting"; joinUrl: string | null }).joinUrl ?? toat.link;
+      if (url) return { label: "Join", href: url, external: true };
+      break;
+    }
+    case "call": {
+      const phone = (td as { template: "call"; phone: string | null }).phone;
+      if (phone) return { label: "Call", href: `tel:${phone.replace(/\s+/g, "")}`, external: true };
+      break;
+    }
+    case "follow_up": {
+      const fud = td as { template: "follow_up"; phone: string | null; email: string | null; channel: string | null };
+      if (fud.channel === "call" && fud.phone) return { label: "Call", href: `tel:${fud.phone.replace(/\s+/g, "")}`, external: true };
+      if (fud.channel === "email" && fud.email) return { label: "Email", href: `mailto:${fud.email}`, external: true };
+      break;
+    }
+    case "appointment": {
+      const appt = td as { template: "appointment"; address: string | null };
+      const href = mapHref(appt.address ?? toat.location);
+      if (href) return { label: "Directions", href, external: true };
+      break;
+    }
+    case "errand": {
+      const errand = td as { template: "errand"; address: string | null };
+      const href = mapHref(errand.address ?? toat.location);
+      if (href) return { label: "Directions", href, external: true };
+      break;
+    }
+    case "event": {
+      const ev = td as { template: "event"; ticketUrl: string | null };
+      const url = ev.ticketUrl ?? toat.link;
+      if (url) return { label: "Tickets", href: url, external: true };
+      if (directions) return { label: "Directions", href: directions, external: true };
+      break;
+    }
+    default:
+      if (directions) return { label: "Directions", href: directions, external: true };
+  }
+
+  return null;
 }
 
 function getCountdownLabel(toat: TimelineToat, now: Date) {
@@ -289,34 +302,6 @@ function getCountdownLabel(toat: TimelineToat, now: Date) {
   if (diffMinutes > 15) return `Starting in ${formatMinutesLabel(diffMinutes)}`;
   if (diffMinutes <= 0 && (!end || now > end)) return "Past due";
   return formatTime(start);
-}
-
-function getPrimaryAction(toat: TimelineToat) {
-  const visual = getToatVisual(toat);
-  const phone = extractPhone(toat);
-  const directions = mapHref(toat.location);
-
-  if ((toat.kind === "meeting" || visual.actionLabel === "Join") && toat.link) {
-    return { label: "Join", href: toat.link, external: true };
-  }
-
-  if (visual.actionLabel === "Call" && phone) {
-    return { label: "Call", href: `tel:${phone.replace(/\s+/g, "")}`, external: true };
-  }
-
-  if (visual.actionLabel === "Message" && toat.link) {
-    return { label: "Message", href: toat.link, external: true };
-  }
-
-  if (directions && (visual.actionLabel === "Directions" || toat.location)) {
-    return { label: "Directions", href: directions, external: true };
-  }
-
-  if (toat.kind === "event" && toat.link) {
-    return { label: "Tickets", href: toat.link, external: true };
-  }
-
-  return null;
 }
 
 function getToatDescription(toat: TimelineToat, now: Date) {

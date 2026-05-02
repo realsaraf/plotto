@@ -6,11 +6,107 @@ import { join } from "path";
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
-export const ToatKindSchema = z.enum(["task", "event", "meeting", "errand", "deadline", "idea"]);
+export const ToatTemplateSchema = z.enum([
+  "meeting",
+  "call",
+  "appointment",
+  "event",
+  "deadline",
+  "task",
+  "checklist",
+  "errand",
+  "follow_up",
+  "idea",
+]);
+
 export const ToatTierSchema = z.enum(["urgent", "important", "regular"]);
 
+// ─── Template data sub-schemas ────────────────────────────────────────────────
+
+const MeetingDataSchema = z.object({
+  template: z.literal("meeting"),
+  joinUrl: z.string().nullable(),
+  attendees: z.array(z.string()),
+  agenda: z.string().nullable(),
+});
+
+const CallDataSchema = z.object({
+  template: z.literal("call"),
+  phone: z.string().nullable(),
+  contactName: z.string().nullable(),
+});
+
+const AppointmentDataSchema = z.object({
+  template: z.literal("appointment"),
+  providerName: z.string().nullable(),
+  phone: z.string().nullable(),
+  address: z.string().nullable(),
+});
+
+const EventDataSchema = z.object({
+  template: z.literal("event"),
+  venue: z.string().nullable(),
+  ticketUrl: z.string().nullable(),
+  doorsAt: z.string().nullable(),
+});
+
+const DeadlineDataSchema = z.object({
+  template: z.literal("deadline"),
+  dueAt: z.string().nullable(),
+  softDeadline: z.boolean(),
+});
+
+const TaskDataSchema = z.object({
+  template: z.literal("task"),
+  completedAt: z.string().nullable(),
+});
+
+const ChecklistItemSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  done: z.boolean(),
+});
+
+const ChecklistDataSchema = z.object({
+  template: z.literal("checklist"),
+  items: z.array(ChecklistItemSchema),
+});
+
+const ErrandDataSchema = z.object({
+  template: z.literal("errand"),
+  address: z.string().nullable(),
+  storeOrVenue: z.string().nullable(),
+});
+
+const FollowUpDataSchema = z.object({
+  template: z.literal("follow_up"),
+  contactName: z.string().nullable(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  channel: z.enum(["call", "email", "message"]).nullable(),
+});
+
+const IdeaDataSchema = z.object({
+  template: z.literal("idea"),
+  revisitAt: z.string().nullable(),
+  tags: z.array(z.string()),
+});
+
+export const TemplateDataSchema = z.discriminatedUnion("template", [
+  MeetingDataSchema,
+  CallDataSchema,
+  AppointmentDataSchema,
+  EventDataSchema,
+  DeadlineDataSchema,
+  TaskDataSchema,
+  ChecklistDataSchema,
+  ErrandDataSchema,
+  FollowUpDataSchema,
+  IdeaDataSchema,
+]);
+
 export const ExtractedToatSchema = z.object({
-  kind: ToatKindSchema,
+  template: ToatTemplateSchema,
   tier: ToatTierSchema,
   title: z.string(),
   datetime: z.string().nullable(),
@@ -19,6 +115,7 @@ export const ExtractedToatSchema = z.object({
   link: z.string().nullable(),
   people: z.array(z.string()),
   notes: z.string().nullable(),
+  templateData: TemplateDataSchema,
 });
 
 export const ExtractionResultSchema = z.object({

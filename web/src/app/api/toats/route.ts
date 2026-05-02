@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth/require-user";
 import { getCollections } from "@/lib/mongo/collections";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { templateToKind, emptyTemplateData } from "@/types";
+import { TemplateDataSchema, ToatTemplateSchema } from "@/lib/ai/extract";
 
 const ToatQuerySchema = z.object({
   range: z.enum(["today", "week", "upcoming", "past", "all"]).optional().default("all"),
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest) {
   }
 
   const BodySchema = z.object({
-    kind: z.enum(["task", "event", "meeting", "errand", "deadline", "idea"]),
+    template: ToatTemplateSchema,
     tier: z.enum(["urgent", "important", "regular"]).optional().default("regular"),
     title: z.string().min(1).max(200),
     datetime: z.string().nullable().optional(),
@@ -77,6 +79,7 @@ export async function POST(request: NextRequest) {
     link: z.string().url().nullable().optional(),
     people: z.array(z.string()).optional().default([]),
     notes: z.string().nullable().optional(),
+    templateData: TemplateDataSchema.optional(),
   });
 
   const parsed = BodySchema.safeParse(body);
@@ -87,11 +90,13 @@ export async function POST(request: NextRequest) {
   const { toats } = await getCollections();
   const ownerId = new ObjectId(user.mongoId);
   const now = new Date();
+  const template = parsed.data.template;
 
   const doc = {
     ownerId,
     captureId: null,
-    kind: parsed.data.kind,
+    template,
+    kind: templateToKind(template),
     tier: parsed.data.tier,
     title: parsed.data.title,
     datetime: parsed.data.datetime ? new Date(parsed.data.datetime) : null,
@@ -100,6 +105,7 @@ export async function POST(request: NextRequest) {
     link: parsed.data.link ?? null,
     people: parsed.data.people,
     notes: parsed.data.notes ?? null,
+    templateData: parsed.data.templateData ?? emptyTemplateData(template),
     status: "active",
     createdAt: now,
     updatedAt: now,
@@ -114,10 +120,12 @@ export async function POST(request: NextRequest) {
 // ─── Serializer ───────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function serializeToat(doc: any) {
+export function serializeToat(doc: any) {
+  const template = doc.template ?? "task";
   return {
     id: doc._id.toString(),
-    kind: doc.kind,
+    template,
+    kind: doc.kind ?? templateToKind(template),
     tier: doc.tier ?? "regular",
     title: doc.title,
     datetime: doc.datetime ? (doc.datetime as Date).toISOString() : null,
@@ -127,12 +135,8 @@ function serializeToat(doc: any) {
     people: doc.people ?? [],
     notes: doc.notes ?? null,
     status: doc.status ?? "active",
+    templateData: doc.templateData ?? emptyTemplateData(template),
     captureId: doc.captureId?.toString() ?? null,
-    externalProvider: doc.externalProvider ?? null,
-    externalCalendarId: doc.externalCalendarId ?? null,
-    externalEventId: doc.externalEventId ?? null,
-    syncOrigin: doc.syncOrigin ?? null,
-    lastSyncedAt: doc.lastSyncedAt ? (doc.lastSyncedAt as Date).toISOString() : null,
     createdAt: (doc.createdAt as Date).toISOString(),
     updatedAt: (doc.updatedAt as Date).toISOString(),
   };

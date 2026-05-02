@@ -272,7 +272,7 @@ class _ToatPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = _kindColors(toat.kind);
+    final colors = _templateColors(toat.template);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -756,43 +756,53 @@ List<Color> _avatarColors(String name) {
   return palettes[name.hashCode.abs() % palettes.length];
 }
 
-List<Color> _kindColors(String kind) {
-  switch (kind) {
+// Template-based color dispatch
+List<Color> _templateColors(String template) {
+  switch (template) {
     case 'meeting':
-      return const [Color(0xFF3B82F6), Color(0xFF2563EB)];
+      return const [Color(0xFF60A5FA), Color(0xFF2563EB)];
+    case 'call':
+      return const [Color(0xFFF43F5E), Color(0xFFEC4899)];
+    case 'appointment':
+      return const [Color(0xFF7C3AED), Color(0xFF5B3DF5)];
     case 'event':
       return const [Color(0xFF7C3AED), Color(0xFFA855F7)];
-    case 'errand':
-      return const [Color(0xFFEC4899), Color(0xFFD946EF)];
     case 'deadline':
       return const [Color(0xFFEF4444), Color(0xFFF97316)];
+    case 'checklist':
+      return const [Color(0xFF4ADE80), Color(0xFF16A34A)];
+    case 'errand':
+      return const [Color(0xFFEC4899), Color(0xFFD946EF)];
+    case 'follow_up':
+      return const [Color(0xFF06B6D4), Color(0xFF0891B2)];
     case 'idea':
       return const [Color(0xFFF59E0B), Color(0xFFFBBF24)];
-    case 'task':
-    default:
+    default: // task
       return const [Color(0xFF7C3AED), Color(0xFF4F46E5)];
   }
 }
 
 IconData _kindIcon(ToatSummary toat) {
-  final text = '${toat.title} ${toat.location ?? ''} ${toat.notes ?? ''}'
-      .toLowerCase();
-  if (text.contains('dentist') || text.contains('dental')) {
-    return Icons.medical_services_rounded;
-  }
-  switch (toat.kind) {
+  switch (toat.template) {
     case 'meeting':
       return Icons.videocam_rounded;
+    case 'call':
+      return Icons.call_rounded;
+    case 'appointment':
+      return Icons.medical_services_rounded;
     case 'event':
       return Icons.calendar_month_rounded;
-    case 'errand':
-      return Icons.shopping_bag_rounded;
     case 'deadline':
       return Icons.flag_rounded;
+    case 'checklist':
+      return Icons.checklist_rounded;
+    case 'errand':
+      return Icons.shopping_bag_rounded;
+    case 'follow_up':
+      return Icons.replay_rounded;
     case 'idea':
       return Icons.lightbulb_rounded;
-    case 'task':
-    default:
+    default: // task
       return Icons.check_rounded;
   }
 }

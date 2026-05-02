@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth/require-user";
 import { getCollections } from "@/lib/mongo/collections";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
+import { templateToKind, emptyTemplateData } from "@/types";
+import { TemplateDataSchema, ToatTemplateSchema } from "@/lib/ai/extract";
 
 // ─── GET /api/toats/[id] ──────────────────────────────────────────────────────
 export async function GET(
@@ -48,7 +50,7 @@ export async function PATCH(
   }
 
   const PatchSchema = z.object({
-    kind: z.enum(["task", "event", "meeting", "errand", "deadline", "idea"]).optional(),
+    template: ToatTemplateSchema.optional(),
     tier: z.enum(["urgent", "important", "regular"]).optional(),
     title: z.string().min(1).max(200).optional(),
     datetime: z.string().nullable().optional(),
@@ -58,6 +60,7 @@ export async function PATCH(
     people: z.array(z.string()).optional(),
     notes: z.string().nullable().optional(),
     status: z.enum(["active", "snoozed", "done", "cancelled", "archived"]).optional(),
+    templateData: TemplateDataSchema.optional(),
   });
 
   const parsed = PatchSchema.safeParse(body);
@@ -69,7 +72,10 @@ export async function PATCH(
   const $set: Record<string, any> = { updatedAt: new Date() };
   const data = parsed.data;
 
-  if (data.kind !== undefined) $set.kind = data.kind;
+  if (data.template !== undefined) {
+    $set.template = data.template;
+    $set.kind = templateToKind(data.template);
+  }
   if (data.tier !== undefined) $set.tier = data.tier;
   if (data.title !== undefined) $set.title = data.title;
   if (data.datetime !== undefined) $set.datetime = data.datetime ? new Date(data.datetime) : null;
@@ -79,6 +85,7 @@ export async function PATCH(
   if (data.people !== undefined) $set.people = data.people;
   if (data.notes !== undefined) $set.notes = data.notes;
   if (data.status !== undefined) $set.status = data.status;
+  if (data.templateData !== undefined) $set.templateData = data.templateData;
 
   const { toats } = await getCollections();
   const result = await toats.findOneAndUpdate(
@@ -117,9 +124,11 @@ export async function DELETE(
 // ─── Serializer ───────────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeToat(doc: any) {
+  const template = doc.template ?? "task";
   return {
     id: doc._id.toString(),
-    kind: doc.kind,
+    template,
+    kind: doc.kind ?? templateToKind(template),
     tier: doc.tier ?? "regular",
     title: doc.title,
     datetime: doc.datetime ? (doc.datetime as Date).toISOString() : null,
@@ -129,12 +138,8 @@ function serializeToat(doc: any) {
     people: doc.people ?? [],
     notes: doc.notes ?? null,
     status: doc.status ?? "active",
+    templateData: doc.templateData ?? emptyTemplateData(template),
     captureId: doc.captureId?.toString() ?? null,
-    externalProvider: doc.externalProvider ?? null,
-    externalCalendarId: doc.externalCalendarId ?? null,
-    externalEventId: doc.externalEventId ?? null,
-    syncOrigin: doc.syncOrigin ?? null,
-    lastSyncedAt: doc.lastSyncedAt ? (doc.lastSyncedAt as Date).toISOString() : null,
     createdAt: (doc.createdAt as Date).toISOString(),
     updatedAt: (doc.updatedAt as Date).toISOString(),
   };

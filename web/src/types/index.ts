@@ -6,6 +6,24 @@ import { ObjectId } from "mongodb";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
+/**
+ * The 10 toat templates.  Each discriminates a typed templateData payload.
+ * The legacy `kind` field is retained in the DB for backward compat but
+ * the template field is the single source of truth for UI dispatch.
+ */
+export type ToatTemplate =
+  | "meeting"
+  | "call"
+  | "appointment"
+  | "event"
+  | "deadline"
+  | "task"
+  | "checklist"
+  | "errand"
+  | "follow_up"
+  | "idea";
+
+/** Coarse kind bucket still used for Ping policy.  Derived from template. */
 export type ToatKind =
   | "task"
   | "event"
@@ -34,6 +52,89 @@ export type PingChannel = "local" | "push" | "email" | "sms" | "critical_alert";
 
 export type ShareRole = "view" | "edit";
 
+// ─── Template-specific data payloads ─────────────────────────────────────────
+
+export interface MeetingData {
+  template: "meeting";
+  joinUrl: string | null;       // Zoom / Meet / Teams URL
+  attendees: string[];          // names / handles
+  agenda: string | null;        // free-text agenda
+}
+
+export interface CallData {
+  template: "call";
+  phone: string | null;         // E.164 or human-readable
+  contactName: string | null;   // resolved connection name
+}
+
+export interface AppointmentData {
+  template: "appointment";
+  providerName: string | null;  // "Dr Smith", "Dentist"
+  phone: string | null;         // clinic phone
+  address: string | null;       // physical address
+}
+
+export interface EventData {
+  template: "event";
+  venue: string | null;
+  ticketUrl: string | null;
+  doorsAt: string | null;       // ISO 8601
+}
+
+export interface DeadlineData {
+  template: "deadline";
+  dueAt: string | null;         // ISO 8601, may differ from scheduledAt
+  softDeadline: boolean;        // true = aspirational, false = hard
+}
+
+export interface TaskData {
+  template: "task";
+  completedAt: string | null;   // ISO 8601
+}
+
+export interface ChecklistItem {
+  id: string;                   // client-generated stable key
+  text: string;
+  done: boolean;
+}
+
+export interface ChecklistData {
+  template: "checklist";
+  items: ChecklistItem[];
+}
+
+export interface ErrandData {
+  template: "errand";
+  address: string | null;
+  storeOrVenue: string | null;
+}
+
+export interface FollowUpData {
+  template: "follow_up";
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  channel: "call" | "email" | "message" | null;
+}
+
+export interface IdeaData {
+  template: "idea";
+  revisitAt: string | null;     // ISO 8601
+  tags: string[];
+}
+
+export type TemplateData =
+  | MeetingData
+  | CallData
+  | AppointmentData
+  | EventData
+  | DeadlineData
+  | TaskData
+  | ChecklistData
+  | ErrandData
+  | FollowUpData
+  | IdeaData;
+
 // ─── MongoDB document types ───────────────────────────────────────────────────
 
 export interface UserDoc {
@@ -50,17 +151,20 @@ export interface UserDoc {
 
 export interface ToatDoc {
   _id: ObjectId;
-  userId: string;           // Mongo _id string of the owner
-  captureId: string | null;
-  kind: ToatKind;
+  ownerId: ObjectId;
+  captureId: ObjectId | null;
+  template: ToatTemplate;
+  kind: ToatKind;               // coarse bucket for Ping policy; derived from template
   tier: ToatTier;
   status: ToatStatus;
   title: string;
-  note: string | null;
-  scheduledAt: Date | null;
-  completedAt: Date | null;
-  kindData: Record<string, unknown>;
-  people: string[];         // Mongo _id strings of Person docs
+  datetime: Date | null;
+  endDatetime: Date | null;
+  location: string | null;      // shared convenience field (address / venue)
+  link: string | null;          // shared convenience field (URL)
+  people: string[];             // names / @handles
+  notes: string | null;
+  templateData: TemplateData;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -136,16 +240,71 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
+/** Shape returned by /api/toats and /api/captures — all dates as ISO strings */
+export interface SerializedToat {
+  id: string;
+  template: ToatTemplate;
+  kind: ToatKind;
+  tier: ToatTier;
+  title: string;
+  datetime: string | null;
+  endDatetime: string | null;
+  location: string | null;
+  link: string | null;
+  people: string[];
+  notes: string | null;
+  status: ToatStatus;
+  templateData: TemplateData;
+  captureId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ExtractionResult {
   toats: Array<{
+    template: ToatTemplate;
     kind: ToatKind;
     tier: ToatTier;
     title: string;
-    note: string | null;
-    scheduledAt: string | null; // ISO 8601
-    kindData: Record<string, unknown>;
+    datetime: string | null;     // ISO 8601
+    endDatetime: string | null;
+    location: string | null;
+    link: string | null;
     people: string[];
+    notes: string | null;
+    templateData: TemplateData;
   }>;
-  confidence: number;
-  rawTranscript: string;
+}
+
+// ─── Template helper: derive coarse kind from template ───────────────────────
+
+export function templateToKind(template: ToatTemplate): ToatKind {
+  switch (template) {
+    case "meeting": return "meeting";
+    case "call": return "task";
+    case "appointment": return "errand";
+    case "event": return "event";
+    case "deadline": return "deadline";
+    case "task": return "task";
+    case "checklist": return "task";
+    case "errand": return "errand";
+    case "follow_up": return "task";
+    case "idea": return "idea";
+  }
+}
+
+/** Build a default (empty) templateData for a given template discriminant. */
+export function emptyTemplateData(template: ToatTemplate): TemplateData {
+  switch (template) {
+    case "meeting":    return { template, joinUrl: null, attendees: [], agenda: null };
+    case "call":       return { template, phone: null, contactName: null };
+    case "appointment":return { template, providerName: null, phone: null, address: null };
+    case "event":      return { template, venue: null, ticketUrl: null, doorsAt: null };
+    case "deadline":   return { template, dueAt: null, softDeadline: false };
+    case "task":       return { template, completedAt: null };
+    case "checklist":  return { template, items: [] };
+    case "errand":     return { template, address: null, storeOrVenue: null };
+    case "follow_up":  return { template, contactName: null, phone: null, email: null, channel: null };
+    case "idea":       return { template, revisitAt: null, tags: [] };
+  }
 }

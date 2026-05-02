@@ -101,6 +101,6 @@ export function buildConnectionContext(connections: SerializedConnection[]): str
   return [
     "User connections for resolving family/member references:",
     ...lines,
-    "When the transcript mentions a relationship such as mom, dad, spouse, son, daughter, brother, sister, or a saved name, use the matching connection. Put the connection's name in people. If a phone number is relevant for a call or message toat, include it in notes as `Phone: <number>`.",
+    "When the transcript mentions a relationship (mom, dad, spouse, son, daughter, brother, sister) or a saved name, use the matching connection. Put the connection's name in the base `people` array. If a phone number is relevant for a call, put it in templateData.phone — never in notes.",
   ].join("\n");
 }

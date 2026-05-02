@@ -385,11 +385,13 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
   }
 
   String _primaryActionLabel(ToatSummary toat) {
-    if (_extractPhone(toat) != null) {
+    if (_detailPhone(toat) != null) {
       return 'Call';
     }
-    if (toat.kind == 'meeting' && toat.link != null && toat.link!.isNotEmpty) {
-      return 'Join';
+    if (toat.template == 'meeting') {
+      final joinUrl = toat.templateData['joinUrl'] as String?;
+      final link = joinUrl?.isNotEmpty == true ? joinUrl : toat.link;
+      if (link != null && link.isNotEmpty) return 'Join';
     }
     if (toat.location != null && toat.location!.isNotEmpty) {
       return 'Directions';
@@ -399,13 +401,15 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
   }
 
   Uri? _primaryActionUri(ToatSummary toat) {
-    final phone = _extractPhone(toat);
+    final phone = _detailPhone(toat);
     if (phone != null) {
       return Uri(scheme: 'tel', path: _normalizedPhone(phone));
     }
 
-    if (toat.kind == 'meeting' && toat.link != null && toat.link!.isNotEmpty) {
-      return _externalUri(toat.link!);
+    if (toat.template == 'meeting') {
+      final joinUrl = toat.templateData['joinUrl'] as String?;
+      final link = joinUrl?.isNotEmpty == true ? joinUrl : toat.link;
+      if (link != null && link.isNotEmpty) return _externalUri(link);
     }
 
     if (toat.location != null && toat.location!.isNotEmpty) {
@@ -416,18 +420,6 @@ class _ToatDetailScreenState extends State<ToatDetailScreen> {
     }
 
     return null;
-  }
-
-  String? _extractPhone(ToatSummary toat) {
-    final haystack = <String?>[
-      toat.title,
-      toat.notes,
-      toat.location,
-      toat.link,
-      ...toat.people,
-    ].whereType<String>().join(' ');
-    final match = RegExp(r'(\+?\d[\d\s().-]{7,}\d)').firstMatch(haystack);
-    return match?.group(1);
   }
 
   String _normalizedPhone(String phone) {
@@ -469,14 +461,14 @@ class _HeroSection extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            _detailKindColors(toat.kind).first.withValues(alpha: 0.10),
-            _detailKindColors(toat.kind).last.withValues(alpha: 0.05),
+            _detailTemplateColors(toat.template).first.withValues(alpha: 0.10),
+            _detailTemplateColors(toat.template).last.withValues(alpha: 0.05),
             Colors.white.withValues(alpha: 0.86),
           ],
         ),
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: _detailKindColors(toat.kind).last.withValues(alpha: 0.12),
+          color: _detailTemplateColors(toat.template).last.withValues(alpha: 0.12),
         ),
         boxShadow: const [
           BoxShadow(
@@ -498,12 +490,12 @@ class _HeroSection extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
                   gradient: LinearGradient(
-                    colors: _detailKindColors(toat.kind),
+                    colors: _detailTemplateColors(toat.template),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: _detailKindColors(
-                        toat.kind,
+                      color: _detailTemplateColors(
+                        toat.template,
                       ).last.withValues(alpha: 0.24),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
@@ -511,7 +503,7 @@ class _HeroSection extends StatelessWidget {
                   ],
                 ),
                 child: Icon(
-                  _detailKindIcon(toat.kind),
+                  _detailTemplateIcon(toat.template),
                   color: Colors.white,
                   size: 42,
                 ),
@@ -522,8 +514,8 @@ class _HeroSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _Pill(
-                      label: toat.kind.toUpperCase(),
-                      color: _detailKindColors(toat.kind).last,
+                      label: toat.template.toUpperCase(),
+                      color: _detailTemplateColors(toat.template).last,
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -776,7 +768,7 @@ String _detailSubtitle(ToatSummary toat) {
   if (toat.location != null && toat.location!.isNotEmpty) {
     return toat.location!;
   }
-  if (toat.link != null && toat.link!.isNotEmpty && toat.kind == 'meeting') {
+  if (toat.link != null && toat.link!.isNotEmpty && toat.template == 'meeting') {
     return _meetingPlatform(toat.link!);
   }
   if (toat.people.isNotEmpty) {
@@ -796,40 +788,80 @@ String _meetingPlatform(String link) {
   return 'Meeting link';
 }
 
-List<Color> _detailKindColors(String kind) {
-  switch (kind) {
+/// Returns phone from typed templateData — no regex.
+String? _detailPhone(ToatSummary toat) {
+  final td = toat.templateData;
+  switch (toat.template) {
+    case 'call':
+    case 'appointment':
+    case 'follow_up':
+      final phone = td['phone'];
+      if (phone is String && phone.isNotEmpty) return phone;
+      break;
+    default:
+      break;
+  }
+  return null;
+}
+
+// Template-based color dispatch
+List<Color> _detailTemplateColors(String template) {
+  switch (template) {
     case 'meeting':
       return const [Color(0xFF60A5FA), Color(0xFF2563EB)];
-    case 'errand':
+    case 'call':
+      return const [Color(0xFFF43F5E), Color(0xFFEC4899)];
+    case 'appointment':
+      return const [Color(0xFF7C3AED), Color(0xFF5B3DF5)];
+    case 'event':
+      return const [Color(0xFF7C3AED), Color(0xFF5B3DF5)];
+    case 'deadline':
+      return const [Color(0xFFEF4444), Color(0xFFDC2626)];
+    case 'checklist':
       return const [Color(0xFF4ADE80), Color(0xFF16A34A)];
+    case 'errand':
+      return const [Color(0xFFA855F7), Color(0xFF8B5CF6)];
+    case 'follow_up':
+      return const [Color(0xFF06B6D4), Color(0xFF0891B2)];
     case 'idea':
       return const [Color(0xFFFBBF24), Color(0xFFF59E0B)];
-    case 'deadline':
-      return const [Color(0xFFFB7185), Color(0xFFEC4899)];
-    default:
+    default: // task
       return const [Color(0xFF8B5CF6), Color(0xFF6D28D9)];
   }
 }
 
-IconData _detailKindIcon(String kind) {
-  switch (kind) {
+// Template-based icon dispatch
+IconData _detailTemplateIcon(String template) {
+  switch (template) {
     case 'meeting':
       return Icons.videocam_rounded;
+    case 'call':
+      return Icons.call_rounded;
+    case 'appointment':
+      return Icons.medical_services_outlined;
+    case 'event':
+      return Icons.confirmation_number_outlined;
+    case 'deadline':
+      return Icons.timer_outlined;
+    case 'checklist':
+      return Icons.checklist_rounded;
     case 'errand':
       return Icons.shopping_cart_outlined;
+    case 'follow_up':
+      return Icons.replay_rounded;
     case 'idea':
       return Icons.lightbulb_outline_rounded;
-    case 'deadline':
-      return Icons.call_rounded;
-    default:
+    default: // task
       return Icons.mail_outline_rounded;
   }
 }
 
 IconData _detailActionIcon(ToatSummary toat) {
   if (_detailPhone(toat) != null) return Icons.call_rounded;
-  if (toat.kind == 'meeting' && toat.link != null && toat.link!.isNotEmpty) {
-    return Icons.videocam_rounded;
+  if (toat.template == 'meeting') {
+    final joinUrl = toat.templateData['joinUrl'] as String?;
+    final link = joinUrl?.isNotEmpty == true ? joinUrl : toat.link;
+    if (link != null && link.isNotEmpty) return Icons.videocam_rounded;
   }
   if (toat.location != null && toat.location!.isNotEmpty) {
     return Icons.navigation_rounded;
@@ -841,23 +873,15 @@ List<Color> _detailActionColors(ToatSummary toat) {
   if (_detailPhone(toat) != null) {
     return const [Color(0xFFFB7185), Color(0xFFEC4899)];
   }
-  if (toat.kind == 'meeting' && toat.link != null && toat.link!.isNotEmpty) {
-    return const [Color(0xFF3B82F6), Color(0xFF2563EB)];
+  if (toat.template == 'meeting') {
+    final joinUrl = toat.templateData['joinUrl'] as String?;
+    final link = joinUrl?.isNotEmpty == true ? joinUrl : toat.link;
+    if (link != null && link.isNotEmpty) {
+      return const [Color(0xFF3B82F6), Color(0xFF2563EB)];
+    }
   }
   if (toat.location != null && toat.location!.isNotEmpty) {
     return const [Color(0xFF7C3AED), Color(0xFF6D28D9)];
   }
   return const [Color(0xFF8B5CF6), Color(0xFFEC4899)];
-}
-
-String? _detailPhone(ToatSummary toat) {
-  final haystack = <String?>[
-    toat.title,
-    toat.notes,
-    toat.location,
-    toat.link,
-    ...toat.people,
-  ].whereType<String>().join(' ');
-  final match = RegExp(r'(\+?\d[\d\s().-]{7,}\d)').firstMatch(haystack);
-  return match?.group(1);
 }

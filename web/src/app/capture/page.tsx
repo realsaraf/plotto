@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TopNav } from "@/components/TopNav";
 import { useAuth } from "@/lib/auth/auth-context";
+import type { ToatTemplate } from "@/types";
 
 type CaptureStatus = "idle" | "listening" | "processing" | "review" | "error";
 type CaptureMode = "voice" | "text";
@@ -12,11 +13,10 @@ const WAVEFORM_BARS = 20;
 
 const MIN_ANALYSER_FFT_SIZE = 32;
 
-type ToatKind = "task" | "event" | "meeting" | "errand" | "deadline" | "idea";
 type ToatTier = "urgent" | "important" | "regular";
 
 interface ExtractedToat {
-  kind: ToatKind;
+  template: ToatTemplate;
   tier: ToatTier;
   title: string;
   datetime: string | null;
@@ -27,13 +27,17 @@ interface ExtractedToat {
   notes: string | null;
 }
 
-const KIND_META: Record<ToatKind, { emoji: string; color: string; bg: string }> = {
-  task:     { emoji: "✓",  color: "#6366F1", bg: "#EDE9FE" },
-  event:    { emoji: "🎫", color: "#7C3AED", bg: "#F3E8FF" },
-  meeting:  { emoji: "💬", color: "#2563EB", bg: "#DBEAFE" },
-  errand:   { emoji: "📍", color: "#D97706", bg: "#FEF3C7" },
-  deadline: { emoji: "⚡", color: "#DC2626", bg: "#FEE2E2" },
-  idea:     { emoji: "💡", color: "#059669", bg: "#D1FAE5" },
+const TEMPLATE_META: Record<ToatTemplate, { emoji: string; color: string; bg: string }> = {
+  task:       { emoji: "✓",  color: "#6366F1", bg: "#EDE9FE" },
+  checklist:  { emoji: "☑",  color: "#16A34A", bg: "#DCFCE7" },
+  event:      { emoji: "🎫", color: "#7C3AED", bg: "#F3E8FF" },
+  meeting:    { emoji: "💬", color: "#2563EB", bg: "#DBEAFE" },
+  call:       { emoji: "📞", color: "#DB2777", bg: "#FCE7F3" },
+  appointment:{ emoji: "🦷", color: "#7C3AED", bg: "#F3E8FF" },
+  errand:     { emoji: "📍", color: "#D97706", bg: "#FEF3C7" },
+  follow_up:  { emoji: "🔄", color: "#0891B2", bg: "#CFFAFE" },
+  deadline:   { emoji: "⚡", color: "#DC2626", bg: "#FEE2E2" },
+  idea:       { emoji: "💡", color: "#059669", bg: "#D1FAE5" },
 };
 
 function getAnalyserFftSize(barCount: number): number {
@@ -589,7 +593,7 @@ function ReviewScreen({ transcript, toats, selected, onToggle, onToggleAll, onAd
 }
 
 function ReviewToatCard({ toat, checked, onToggle }: { toat: ExtractedToat; checked: boolean; onToggle: () => void }) {
-  const meta = KIND_META[toat.kind];
+  const meta = TEMPLATE_META[toat.template];
   const dt = toat.datetime ? new Date(toat.datetime) : null;
   const timeStr = dt ? dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + ", " + dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
   return (
